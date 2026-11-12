@@ -47,7 +47,7 @@ cp backend/.env.example backend/.env
 ```
 
 ```bash
-cd backend && npx prisma migrate deploy && npm run db:seed
+cd backend && npx prisma generate && npx prisma migrate deploy && npm run db:seed
 ```
 
 Poi, in due terminali separati:
@@ -72,6 +72,13 @@ La pagina di prenotazione pazienti è su <http://localhost:5173/prenota>.
 
 > Cambia subito le password e `JWT_SECRET` prima di usarlo con dati reali.
 > Per creare solo l'amministratore senza dati di esempio: `SEED_DEMO=false npm run db:seed`.
+
+### Su Windows (PowerShell)
+
+- Se `npm` dà l'errore "L'esecuzione di script è disabilitata", esegui una volta
+  `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, oppure usa `npm.cmd`.
+- Windows PowerShell 5 non accetta `&&`: esegui i comandi uno per riga.
+- Se la porta 4000 è già occupata, cambia `PORT` e `FRONTEND_URL` in `backend/.env`.
 
 ## Produzione
 
