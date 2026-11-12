@@ -1,0 +1,173 @@
+// Hospardo – schema dati dell'agenda dello studio medico
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SEGRETERIA
+  MEDICO
+}
+
+enum AppointmentStatus {
+  PRENOTATO
+  CONFERMATO
+  IN_ATTESA // paziente arrivato in sala d'attesa
+  COMPLETATO
+  ANNULLATO
+  NON_PRESENTATO
+}
+
+enum AppointmentSource {
+  INTERNO
+  ONLINE
+}
+
+/// Utente che accede al gestionale (segreteria, medici, amministratori)
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         Role     @default(SEGRETERIA)
+  active       Boolean  @default(true)
+  doctorId     Int?     @unique @map("doctor_id")
+  doctor       Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Doctor {
+  id            Int            @id @default(autoincrement())
+  firstName     String         @map("first_name")
+  lastName      String         @map("last_name")
+  title         String         @default("Dott.")
+  specialty     String?
+  email         String?
+  phone         String?
+  color         String         @default("#2563eb")
+  bio           String?
+  active        Boolean        @default(true)
+  bookableOnline Boolean       @default(true) @map("bookable_online")
+  /// Granularità degli slot proposti (minuti)
+  slotStepMin   Int            @default(15) @map("slot_step_min")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  user          User?
+  services      DoctorService[]
+  workingHours  WorkingHours[]
+  timeOff       TimeOff[]
+  appointments  Appointment[]
+
+  @@map("doctors")
+}
+
+/// Prestazione erogata dallo studio (visita, ecografia, ...)
+model Service {
+  id             Int             @id @default(autoincrement())
+  name           String
+  description    String?
+  durationMin    Int             @map("duration_min")
+  priceCents     Int?            @map("price_cents")
+  color          String?
+  bookableOnline Boolean         @default(true) @map("bookable_online")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  doctors        DoctorService[]
+  appointments   Appointment[]
+
+  @@map("services")
+}
+
+model DoctorService {
+  doctorId  Int     @map("doctor_id")
+  serviceId Int     @map("service_id")
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, serviceId])
+  @@map("doctor_services")
+}
+
+/// Fascia oraria ricorrente settimanale. weekday: 1 = lunedì ... 7 = domenica (ISO)
+model WorkingHours {
+  id        Int    @id @default(autoincrement())
+  doctorId  Int    @map("doctor_id")
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startTime String @map("start_time") // "HH:mm" ora locale dello studio
+  endTime   String @map("end_time")
+
+  @@index([doctorId, weekday])
+  @@map("working_hours")
+}
+
+/// Ferie, assenze, blocchi di agenda
+model TimeOff {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int      @map("doctor_id")
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  start     DateTime
+  end       DateTime
+  reason    String?
+
+  @@index([doctorId, start])
+  @@map("time_off")
+}
+
+model Patient {
+  id             Int           @id @default(autoincrement())
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  fiscalCode     String?       @unique @map("fiscal_code")
+  birthDate      DateTime?     @map("birth_date") @db.Date
+  gender         String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  privacyConsent Boolean       @default(false) @map("privacy_consent")
+  remindersOptIn Boolean       @default(true) @map("reminders_opt_in")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  appointments   Appointment[]
+
+  @@index([lastName, firstName])
+  @@map("patients")
+}
+
+model Appointment {
+  id                 Int               @id @default(autoincrement())
+  doctorId           Int               @map("doctor_id")
+  doctor             Doctor            @relation(fields: [doctorId], references: [id])
+  patientId          Int               @map("patient_id")
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  serviceId          Int?              @map("service_id")
+  service            Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  start              DateTime
+  end                DateTime
+  status             AppointmentStatus @default(PRENOTATO)
+  source             AppointmentSource @default(INTERNO)
+  notes              String?
+  /// Token per annullamento da parte del paziente (link nelle email)
+  manageToken        String            @unique @map("manage_token")
+  confirmationSentAt DateTime?         @map("confirmation_sent_at")
+  reminderSentAt     DateTime?         @map("reminder_sent_at")
+  createdById        Int?              @map("created_by_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@index([doctorId, start])
+  @@index([patientId])
+  @@index([start])
+  @@map("appointments")
+}
