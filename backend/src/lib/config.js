@@ -56,7 +56,8 @@ const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(config.front
 config.isPublic = !isLocal;
 
 if (weakSecret && (process.env.NODE_ENV === 'production' || !isLocal)) {
-  throw new Error('JWT_SECRET non impostato o troppo debole: esegui "npm run setup" nella cartella backend prima di pubblicare l\'agenda.');
+  throw new Error('JWT_SECRET non impostato o troppo debole: esegui "npm run setup" nella cartella backend '
+    + '(con Docker: "docker compose run --rm app npm run setup") prima di pubblicare l\'agenda.');
 }
 if (weakSecret) console.warn('ATTENZIONE: JWT_SECRET di prova. Esegui "npm run setup" prima di usare dati reali.');
 

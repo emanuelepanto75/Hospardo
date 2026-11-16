@@ -56,6 +56,9 @@ npm start
 
 Deve comparire `Hospardo in ascolto su http://localhost:4100`. Lascia aperta questa finestra.
 
+In alternativa, con Docker l'agenda gira in background e si riavvia da sola: vedi "Avvio con Docker" nel README
+(`docker compose up -d --build`, poi `docker compose restart app` dopo ogni modifica a `backend\.env`).
+
 ## 3A. Hai già un tunnel Cloudflare "con nome" (dominio su Cloudflare)
 
 È il caso migliore: si aggiunge l'agenda allo stesso tunnel con un indirizzo fisso.

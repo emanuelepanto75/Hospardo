@@ -1,4 +1,6 @@
-# Database PostgreSQL per lo sviluppo locale: docker compose up -d
+# Hospardo: database + agenda.
+# Avvio (e aggiornamento dopo un git pull):  docker compose up -d --build
+# Entrambi ripartono da soli se si bloccano o al riavvio di Docker.
 services:
   db:
     image: postgres:16
@@ -7,9 +9,34 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: hospardo
+    # raggiungibile solo da questo PC (per strumenti come prisma studio)
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hospardo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    # inoltra correttamente i segnali di arresto al server (stop immediato)
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # dentro Docker il database si chiama "db", non "localhost"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/hospardo?schema=public
+      PORT: "4100"
+    volumes:
+      # la configurazione resta sul PC, in backend/.env (creala prima da backend/.env.example)
+      - ./backend/.env:/app/backend/.env
+    ports:
+      - "${HOSPARDO_PORT:-4100}:4100"
+
 volumes:
   pgdata:

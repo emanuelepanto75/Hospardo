@@ -31,6 +31,8 @@ Configurazione: [docs/whatsapp.md](docs/whatsapp.md).
 
 ## Aggiornare un'installazione esistente
 
+Con Docker bastano `git pull` e `docker compose up -d --build`. Senza Docker:
+
 ```bash
 git pull
 ```
@@ -49,7 +51,39 @@ cd .. && npm run build && npm start
 - Backend: Node.js, Express, Prisma, PostgreSQL, JWT, Zod, Nodemailer, node-cron, Luxon
 - Frontend: React 18, Vite, React Router, Luxon
 
-## Avvio in locale
+## Avvio con Docker (consigliato)
+
+Database e agenda girano in background, ripartono da soli se si bloccano e all'avvio di Docker.
+Serve solo Docker (su Windows: Docker Desktop, con "Start Docker Desktop when you sign in" attivo).
+
+```bash
+cp backend/.env.example backend/.env
+```
+```bash
+docker compose up -d --build
+```
+```bash
+docker compose run --rm app npm run setup
+```
+```bash
+docker compose restart app
+```
+
+L'agenda è su <http://localhost:4100> (porta modificabile con la variabile `HOSPARDO_PORT`).
+Il database viene aggiornato automaticamente a ogni avvio.
+
+| Operazione | Comando |
+| --- | --- |
+| Aggiornare dopo un `git pull` | `docker compose up -d --build` |
+| Vedere i log | `docker compose logs -f app` |
+| Fermare / riavviare | `docker compose stop` / `docker compose start` |
+| Dati di esempio | `docker compose run --rm app npm run db:seed` |
+| Backup del database | `docker compose exec db pg_dump -U postgres hospardo > backup.sql` |
+
+I dati stanno nel volume Docker `pgdata` e restano anche dopo `docker compose down`
+(non usare `docker compose down -v`, che li cancella).
+
+## Avvio in locale senza Docker (sviluppo)
 
 Prerequisiti: Node.js 20+ e PostgreSQL 14+ (oppure Docker).
 

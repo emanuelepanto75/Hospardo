@@ -46,7 +46,8 @@ function askHidden(q) {
 async function main() {
   console.log('\n=== Configurazione di Hospardo ===\n');
   ensureEnv();
-  require('dotenv').config({ path: envPath, override: true });
+  // le variabili già impostate (es. DATABASE_URL in Docker) hanno la precedenza sul file .env
+  require('dotenv').config({ path: envPath });
 
   const bcrypt = require('bcryptjs');
   const { PrismaClient } = require('@prisma/client');
@@ -84,7 +85,7 @@ async function main() {
         console.log('Utenti di prova disattivati.');
       }
     }
-    console.log('\nFatto. Riavvia il server (npm start) per applicare le modifiche.\n');
+    console.log('\nFatto. Riavvia il server per applicare le modifiche: npm start, oppure con Docker "docker compose restart app".\n');
   } finally {
     await prisma.$disconnect();
     rl.close();
