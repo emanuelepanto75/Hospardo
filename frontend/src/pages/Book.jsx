@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { DateTime, euro, fmtTime } from '../lib/time';
-import { doctorName } from '../lib/constants';
+import { doctorName, groupByCategory } from '../lib/constants';
 
 const STRIP_DAYS = 7;
 
@@ -58,7 +58,7 @@ export default function Book() {
           <h1>Prenotazione registrata</h1>
           <p><b>{service.name}</b> con <b>{doctorName(doctor)}</b></p>
           <p className="big-date">{DateTime.fromISO(slot).toFormat("cccc d LLLL yyyy 'alle' HH:mm")}</p>
-          <p className="muted">Ti abbiamo inviato un'email di conferma con il link per gestire o annullare l'appuntamento.</p>
+          <p className="muted">Ti abbiamo inviato la conferma via email (e su WhatsApp, se richiesto) con il link per gestire o annullare l'appuntamento.</p>
           <Link className="btn" to={`/appuntamento/${done}`}>Vedi il tuo appuntamento</Link>
         </div>
       </PublicShell>
@@ -73,16 +73,23 @@ export default function Book() {
 
       <section className="step">
         <div className="step-head"><span className="step-n">1</span> Prestazione {service && <button className="link" onClick={() => reset(1)}>cambia</button>}</div>
-        {service ? <div className="step-value">{service.name} <span className="muted">· {service.durationMin} min {service.priceCents != null && `· ${euro(service.priceCents)}`}</span></div> : (
-          <div className="option-list">
+        {service ? <div className="step-value">{service.name} <span className="muted">· {(doctor?.durationMin ?? service.durationMin)} min {(doctor?.priceCents ?? service.priceCents) != null && `· ${euro(doctor?.priceCents ?? service.priceCents)}`}</span></div> : (
+          <div>
             {!services && <p className="muted">Caricamento…</p>}
             {services?.length === 0 && <p className="muted">Al momento non ci sono prestazioni prenotabili online.</p>}
-            {services?.map((s) => (
-              <button key={s.id} className="option" onClick={() => setService(s)}>
-                <b>{s.name}</b>
-                <span className="muted small">{s.durationMin} min{s.priceCents != null && ` · ${euro(s.priceCents)}`}</span>
-                {s.description && <span className="small">{s.description}</span>}
-              </button>
+            {services && Object.entries(groupByCategory(services)).map(([cat, list]) => (
+              <div key={cat} className="option-group">
+                {Object.keys(groupByCategory(services)).length > 1 && <div className="option-group-title">{cat}</div>}
+                <div className="option-list">
+                  {list.map((s) => (
+                    <button key={s.id} className="option" onClick={() => setService(s)}>
+                      <b>{s.name}</b>
+                      <span className="muted small">{s.durationMin} min{s.priceCents != null && ` · ${euro(s.priceCents)}`}</span>
+                      {s.description && <span className="small">{s.description}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -98,6 +105,9 @@ export default function Book() {
                 <button key={d.id} className="option" style={{ borderLeftColor: d.color }} onClick={() => setDoctor(d)}>
                   <b>{doctorName(d)}</b>
                   <span className="muted small">{d.specialty}</span>
+                  {(d.durationMin !== service.durationMin || d.priceCents !== service.priceCents) && (
+                    <span className="small">{d.durationMin} min{d.priceCents != null && ` · ${euro(d.priceCents)}`}</span>
+                  )}
                   {d.bio && <span className="small">{d.bio}</span>}
                 </button>
               ))}
@@ -141,7 +151,7 @@ export default function Book() {
 }
 
 function BookingForm({ service, doctor, slot, onDone, onConflict }) {
-  const [f, setF] = useState({ firstName: '', lastName: '', email: '', phone: '', fiscalCode: '', birthDate: '', notes: '', privacyConsent: false });
+  const [f, setF] = useState({ firstName: '', lastName: '', email: '', phone: '', fiscalCode: '', birthDate: '', notes: '', whatsappOptIn: true, privacyConsent: false });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
@@ -173,6 +183,7 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
           <label>Data di nascita<input type="date" value={f.birthDate} onChange={set('birthDate')} /></label>
         </div>
         <label>Note per lo studio<textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Facoltative" /></label>
+        <label className="check"><input type="checkbox" checked={f.whatsappOptIn} onChange={set('whatsappOptIn')} /> Voglio ricevere conferma e promemoria anche su WhatsApp</label>
         <label className="check"><input type="checkbox" required checked={f.privacyConsent} onChange={set('privacyConsent')} /> Acconsento al trattamento dei miei dati personali per la gestione della prenotazione *</label>
         {err && <div className="alert">{err}</div>}
         <button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Invio…' : 'Conferma prenotazione'}</button>

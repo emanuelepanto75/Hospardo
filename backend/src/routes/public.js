@@ -8,7 +8,8 @@ const prisma = require('../lib/prisma');
 const config = require('../lib/config');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { getFreeSlots, assertFree, lockDoctor } = require('../services/availability');
-const { sendAppointmentEmail } = require('../services/mailer');
+const { notifyAppointment } = require('../services/notify');
+const { effective } = require('../services/catalog');
 const { DateTime, TZ } = require('../lib/time');
 const { rateLimit } = require('../lib/rateLimit');
 
@@ -16,9 +17,13 @@ router.get('/info', (req, res) => res.json({ clinic: config.clinic, maxDaysAhead
 
 router.get('/services', ah(async (req, res) => {
   const services = await prisma.service.findMany({
-    where: { active: true, bookableOnline: true, doctors: { some: { doctor: { active: true, bookableOnline: true } } } },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, description: true, durationMin: true, priceCents: true },
+    where: {
+      active: true,
+      bookableOnline: true,
+      doctors: { some: { bookableOnline: true, doctor: { active: true, bookableOnline: true } } },
+    },
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    select: { id: true, name: true, category: true, description: true, durationMin: true, priceCents: true },
   });
   res.json(services);
 }));
@@ -26,11 +31,22 @@ router.get('/services', ah(async (req, res) => {
 router.get('/doctors', ah(async (req, res) => {
   const serviceId = req.query.serviceId ? Number(req.query.serviceId) : undefined;
   const doctors = await prisma.doctor.findMany({
-    where: { active: true, bookableOnline: true, ...(serviceId ? { services: { some: { serviceId } } } : {}) },
+    where: {
+      active: true,
+      bookableOnline: true,
+      ...(serviceId ? { services: { some: { serviceId, bookableOnline: true } } } : {}),
+    },
     orderBy: { lastName: 'asc' },
-    select: { id: true, title: true, firstName: true, lastName: true, specialty: true, bio: true, color: true },
+    select: {
+      id: true, title: true, firstName: true, lastName: true, specialty: true, bio: true, color: true,
+      services: serviceId ? { where: { serviceId }, include: { service: true } } : false,
+    },
   });
-  res.json(doctors);
+  res.json(doctors.map(({ services, ...d }) => {
+    if (!services?.length) return d;
+    const e = effective(services[0]);
+    return { ...d, durationMin: e.durationMin, priceCents: e.priceCents };
+  }));
 }));
 
 async function loadBookable(doctorId, serviceId) {
@@ -38,10 +54,10 @@ async function loadBookable(doctorId, serviceId) {
     where: { doctorId_serviceId: { doctorId, serviceId } },
     include: { doctor: true, service: true },
   });
-  if (!link || !link.doctor.active || !link.doctor.bookableOnline || !link.service.active || !link.service.bookableOnline) {
+  if (!link || !link.doctor.active || !link.doctor.bookableOnline || !link.service.active || !effective(link).bookableOnline) {
     throw new HttpError(400, 'Prestazione non prenotabile online con questo medico');
   }
-  return link;
+  return { ...link, durationMin: effective(link).durationMin };
 }
 
 function bookingWindow() {
@@ -56,10 +72,10 @@ router.get('/slots', ah(async (req, res) => {
     serviceId: z.coerce.number().int(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }).parse(req.query);
-  const { service } = await loadBookable(doctorId, serviceId);
+  const { durationMin } = await loadBookable(doctorId, serviceId);
   const { notBefore, lastDay } = bookingWindow();
   if (date > lastDay) return res.json([]);
-  const slots = await getFreeSlots({ doctorId, date, durationMin: service.durationMin, notBefore });
+  const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore });
   res.json(slots.map((s) => s.start));
 }));
 
@@ -71,14 +87,14 @@ router.get('/days', ah(async (req, res) => {
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     days: z.coerce.number().int().min(1).max(42).default(14),
   }).parse(req.query);
-  const { service } = await loadBookable(doctorId, serviceId);
+  const { durationMin } = await loadBookable(doctorId, serviceId);
   const { notBefore, lastDay } = bookingWindow();
   const result = [];
   let d = DateTime.fromISO(from, { zone: TZ });
   for (let i = 0; i < days; i++, d = d.plus({ days: 1 })) {
     const date = d.toISODate();
     if (date > lastDay) break;
-    const slots = await getFreeSlots({ doctorId, date, durationMin: service.durationMin, notBefore });
+    const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore });
     result.push({ date, available: slots.length });
   }
   res.json(result);
@@ -96,18 +112,19 @@ const bookSchema = z.object({
   fiscalCode: z.preprocess(emptyToUndef, z.string().trim().toUpperCase().regex(/^[A-Z0-9]{16}$/, 'Codice fiscale non valido').optional()),
   birthDate: z.preprocess(emptyToUndef, z.coerce.date().optional()),
   notes: z.string().max(1000).optional(),
+  whatsappOptIn: z.boolean().optional(),
   privacyConsent: z.literal(true, { errorMap: () => ({ message: 'Il consenso privacy è obbligatorio' }) }),
 });
 
 router.post('/book', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
   const data = bookSchema.parse(req.body);
-  const { service } = await loadBookable(data.doctorId, data.serviceId);
+  const { durationMin } = await loadBookable(data.doctorId, data.serviceId);
   const { notBefore } = bookingWindow();
-  const end = new Date(data.start.getTime() + service.durationMin * 60000);
+  const end = new Date(data.start.getTime() + durationMin * 60000);
 
   // lo slot deve essere tra quelli effettivamente proposti
   const date = DateTime.fromJSDate(data.start).setZone(TZ).toISODate();
-  const slots = await getFreeSlots({ doctorId: data.doctorId, date, durationMin: service.durationMin, notBefore });
+  const slots = await getFreeSlots({ doctorId: data.doctorId, date, durationMin, notBefore });
   if (!slots.some((s) => +s.start === +data.start)) throw new HttpError(409, 'L\'orario scelto non è più disponibile');
 
   const appt = await prisma.$transaction(async (tx) => {
@@ -136,13 +153,19 @@ router.post('/book', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async 
           fiscalCode: data.fiscalCode ?? null,
           birthDate: data.birthDate ?? null,
           privacyConsent: true,
+          whatsappOptIn: data.whatsappOptIn ?? true,
         },
       });
     } else {
       // aggiorna solo i recapiti mancanti, senza sovrascrivere i dati in anagrafica
       await tx.patient.update({
         where: { id: patient.id },
-        data: { phone: patient.phone || data.phone, email: patient.email || data.email, privacyConsent: true },
+        data: {
+          phone: patient.phone || data.phone,
+          email: patient.email || data.email,
+          privacyConsent: true,
+          ...(data.whatsappOptIn !== undefined ? { whatsappOptIn: data.whatsappOptIn } : {}),
+        },
       });
     }
 
@@ -161,9 +184,7 @@ router.post('/book', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async 
     });
   });
 
-  if (await sendAppointmentEmail(appt, 'conferma')) {
-    await prisma.appointment.update({ where: { id: appt.id }, data: { confirmationSentAt: new Date() } });
-  }
+  await notifyAppointment(appt, 'CONFERMA');
   res.status(201).json({ token: appt.manageToken });
 }));
 
@@ -195,7 +216,7 @@ router.post('/appointment/:token/cancel', rateLimit({ max: 20, windowMs: 60 * 60
     data: { status: 'ANNULLATO', notes: [appt.notes, '[Annullato dal paziente online]'].filter(Boolean).join('\n') },
     include: { patient: true, doctor: true, service: true },
   });
-  await sendAppointmentEmail(updated, 'annullamento');
+  await notifyAppointment(updated, 'ANNULLAMENTO');
   res.json(publicView(updated));
 }));
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, errorMessage } from '../lib/api';
 
-const empty = { firstName: '', lastName: '', fiscalCode: '', birthDate: '', gender: '', email: '', phone: '', address: '', notes: '', privacyConsent: false, remindersOptIn: true };
+const empty = { firstName: '', lastName: '', fiscalCode: '', birthDate: '', gender: '', email: '', phone: '', address: '', notes: '', privacyConsent: false, remindersOptIn: true, whatsappOptIn: true };
 
 export default function PatientForm({ initial, onSaved, onCancel, compact }) {
   const [f, setF] = useState(() => ({
@@ -19,7 +19,7 @@ export default function PatientForm({ initial, onSaved, onCancel, compact }) {
     setErr(null);
     try {
       const body = { ...f, gender: f.gender || null };
-      delete body.id; delete body.createdAt; delete body.updatedAt; delete body.appointments;
+      delete body.id; delete body.createdAt; delete body.updatedAt; delete body.appointments; delete body.notifications;
       const saved = initial?.id
         ? await api(`/patients/${initial.id}`, { method: 'PUT', body })
         : await api('/patients', { method: 'POST', body });
@@ -52,6 +52,7 @@ export default function PatientForm({ initial, onSaved, onCancel, compact }) {
       {!compact && <label>Note<textarea rows={3} value={f.notes} onChange={set('notes')} /></label>}
       <label className="check"><input type="checkbox" checked={f.privacyConsent} onChange={set('privacyConsent')} /> Consenso al trattamento dei dati raccolto</label>
       <label className="check"><input type="checkbox" checked={f.remindersOptIn} onChange={set('remindersOptIn')} /> Invia conferme e promemoria via email</label>
+      <label className="check"><input type="checkbox" checked={f.whatsappOptIn} onChange={set('whatsappOptIn')} /> Invia conferme e promemoria su WhatsApp (al numero di telefono)</label>
       {err && <div className="alert">{err}</div>}
       <div className="row-end">
         {onCancel && <button type="button" className="btn btn-ghost" onClick={onCancel}>Annulla</button>}

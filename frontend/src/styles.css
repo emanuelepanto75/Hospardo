@@ -225,3 +225,12 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
   .day { font-size: .78rem; }
   .hours-day { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---- Integrazioni: prestazioni per medico, notifiche, archiviazione ---- */
+.table-compact td, .table-compact th { padding: 6px 10px; }
+.input-sm { max-width: 110px; padding: 5px 7px; }
+.danger-zone { border-color: #f3c4c4; }
+.notif-log { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.notif-log .page-head .label { margin: 0; }
+.option-group + .option-group { margin-top: 12px; }
+.option-group-title { font-size: .8rem; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }

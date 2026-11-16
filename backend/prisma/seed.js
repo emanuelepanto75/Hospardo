@@ -23,10 +23,18 @@ async function main() {
 
   if ((await prisma.doctor.count()) > 0 || process.env.SEED_DEMO === 'false') return;
 
-  const visita = await prisma.service.create({ data: { name: 'Prima visita', durationMin: 30, priceCents: 12000, description: 'Visita specialistica completa' } });
-  const controllo = await prisma.service.create({ data: { name: 'Visita di controllo', durationMin: 20, priceCents: 8000 } });
-  const ecg = await prisma.service.create({ data: { name: 'Elettrocardiogramma', durationMin: 15, priceCents: 5000 } });
-  const eco = await prisma.service.create({ data: { name: 'Ecografia addome', durationMin: 30, priceCents: 9000, bookableOnline: false } });
+  const visita = await prisma.service.create({ data: { name: 'Prima visita', category: 'Visite specialistiche', durationMin: 30, priceCents: 12000, description: 'Visita specialistica completa' } });
+  const controllo = await prisma.service.create({ data: { name: 'Visita di controllo', category: 'Visite specialistiche', durationMin: 20, priceCents: 8000 } });
+  const ecg = await prisma.service.create({ data: { name: 'Elettrocardiogramma', category: 'Cardiologia', durationMin: 15, priceCents: 5000 } });
+  const eco = await prisma.service.create({ data: { name: 'Ecografia addome', category: 'Diagnostica', durationMin: 30, priceCents: 9000, bookableOnline: false } });
+  const dental = [];
+  for (const [name, durationMin, priceCents, description] of [
+    ['Prima visita odontoiatrica', 30, 6000, 'Visita, controllo carie e piano di cura'],
+    ['Igiene dentale', 45, 8000, 'Pulizia professionale e lucidatura'],
+    ['Otturazione', 45, 12000, null],
+    ['Devitalizzazione', 60, 25000, null],
+    ['Sbiancamento', 60, 30000, null],
+  ]) dental.push(await prisma.service.create({ data: { name, category: 'Odontoiatria', durationMin, priceCents, description } }));
 
   const rossi = await prisma.doctor.create({
     data: {
@@ -45,6 +53,15 @@ async function main() {
       firstName: 'Marco', lastName: 'Bianchi', specialty: 'Medicina interna', color: '#16a34a',
       services: { create: [visita, controllo, eco].map((s) => ({ serviceId: s.id })) },
       workingHours: { create: [1, 3, 5].map((weekday) => ({ weekday, startTime: '15:00', endTime: '19:00' })).concat([{ weekday: 2, startTime: '09:00', endTime: '13:00' }, { weekday: 4, startTime: '09:00', endTime: '13:00' }]) },
+    },
+  });
+
+  await prisma.doctor.create({
+    data: {
+      firstName: 'Paola', lastName: 'Ferri', specialty: 'Odontoiatria', color: '#c2410c', title: 'Dott.ssa',
+      // l'igiene con questa dottoressa dura 60 minuti invece dei 45 standard
+      services: { create: dental.map((s) => ({ serviceId: s.id, ...(s.name === 'Igiene dentale' ? { durationMin: 60 } : {}) })) },
+      workingHours: { create: [2, 4].flatMap((weekday) => [{ weekday, startTime: '09:00', endTime: '13:00' }, { weekday, startTime: '14:00', endTime: '19:00' }]) },
     },
   });
 
@@ -80,7 +97,7 @@ async function main() {
       }));
     }
   }
-  console.log('Dati di esempio creati (2 medici, 4 prestazioni, 4 pazienti, 6 appuntamenti).');
+  console.log('Dati di esempio creati (3 medici, 9 prestazioni, 4 pazienti, 6 appuntamenti).');
   console.log('Altri utenti: segreteria@studio.local / segreteria123, rossi@studio.local / medico12345');
 }
 

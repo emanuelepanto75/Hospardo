@@ -4,7 +4,8 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { getFreeSlots, assertFree, lockDoctor, isWithinWorkingHours } = require('../services/availability');
-const { sendAppointmentEmail } = require('../services/mailer');
+const { notifyAppointment } = require('../services/notify');
+const { durationFor } = require('../services/catalog');
 
 const include = {
   patient: { select: { id: true, firstName: true, lastName: true, phone: true, email: true, fiscalCode: true, remindersOptIn: true } },
@@ -67,13 +68,16 @@ router.get('/availability', ah(async (req, res) => {
     durationMin: z.coerce.number().int().optional(),
   }).parse(req.query);
   let duration = durationMin;
-  if (!duration && serviceId) duration = (await prisma.service.findUnique({ where: { id: serviceId } }))?.durationMin;
+  if (!duration && serviceId) duration = await durationFor(doctorId, serviceId);
   const slots = await getFreeSlots({ doctorId, date, durationMin: duration || 30 });
   res.json(slots);
 }));
 
 router.get('/:id', ah(async (req, res) => {
-  const appt = await prisma.appointment.findUnique({ where: { id: Number(req.params.id) }, include });
+  const appt = await prisma.appointment.findUnique({
+    where: { id: Number(req.params.id) },
+    include: { ...include, notifications: { orderBy: { createdAt: 'desc' } } },
+  });
   if (!appt) throw notFound('Appuntamento');
   res.json(appt);
 }));
@@ -85,7 +89,7 @@ router.post('/', ah(async (req, res) => {
   let end = data.end;
   if (!end) {
     let duration = data.durationMin;
-    if (!duration && data.serviceId) duration = (await prisma.service.findUnique({ where: { id: data.serviceId } }))?.durationMin;
+    if (!duration && data.serviceId) duration = await durationFor(data.doctorId, data.serviceId);
     end = new Date(data.start.getTime() + (duration || 30) * 60000);
   }
   if (end <= data.start) throw new HttpError(400, 'La fine deve essere successiva all\'inizio');
@@ -114,12 +118,7 @@ router.post('/', ah(async (req, res) => {
     });
   });
 
-  if (data.sendEmail !== false) {
-    const full = await prisma.appointment.findUnique({ where: { id: appt.id }, include: { patient: true, doctor: true, service: true } });
-    if (await sendAppointmentEmail(full, 'conferma')) {
-      await prisma.appointment.update({ where: { id: appt.id }, data: { confirmationSentAt: new Date() } });
-    }
-  }
+  if (data.sendEmail !== false) await notifyAppointment(appt.id, 'CONFERMA');
   res.status(201).json(appt);
 }));
 
@@ -166,13 +165,24 @@ router.put('/:id', ah(async (req, res) => {
   });
 
   if (data.status === 'ANNULLATO' && current.status !== 'ANNULLATO') {
-    const full = await prisma.appointment.findUnique({ where: { id }, include: { patient: true, doctor: true, service: true } });
-    await sendAppointmentEmail(full, 'annullamento');
-  } else if (moved) {
-    const full = await prisma.appointment.findUnique({ where: { id }, include: { patient: true, doctor: true, service: true } });
-    await sendAppointmentEmail(full, 'conferma');
+    await notifyAppointment(id, 'ANNULLAMENTO');
+  } else if (moved && !['ANNULLATO', 'NON_PRESENTATO', 'COMPLETATO'].includes(appt.status)) {
+    await notifyAppointment(id, 'SPOSTAMENTO');
   }
   res.json(appt);
+}));
+
+/** Invio manuale di un messaggio al paziente (es. reinvio conferma o promemoria) */
+router.post('/:id/notify', ah(async (req, res) => {
+  const { kind } = z.object({ kind: z.enum(['CONFERMA', 'PROMEMORIA']) }).parse(req.body);
+  const appt = await prisma.appointment.findUnique({ where: { id: Number(req.params.id) } });
+  if (!appt) throw notFound('Appuntamento');
+  assertCanEdit(req.user, appt.doctorId);
+  if (['ANNULLATO', 'NON_PRESENTATO'].includes(appt.status)) throw new HttpError(400, 'Appuntamento annullato: nessun messaggio inviato');
+  const result = await notifyAppointment(appt.id, kind);
+  if (!result.email && !result.whatsapp) throw new HttpError(400, 'Il paziente non ha email o cellulare, oppure ha rifiutato i messaggi');
+  const notifications = await prisma.notification.findMany({ where: { appointmentId: appt.id }, orderBy: { createdAt: 'desc' } });
+  res.json({ result, notifications });
 }));
 
 module.exports = router;

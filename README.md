@@ -13,17 +13,36 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   - suggerimento degli orari liberi, blocco delle sovrapposizioni (forzabile per urgenze)
 - **Pazienti**: ricerca rapida (nome, cognome, telefono, email, codice fiscale), scheda con
   dati anagrafici, consensi, storico e prossimi appuntamenti, creazione al volo dall'agenda
-- **Medici e orari**: dati del medico, colore in agenda, prestazioni erogate, orari settimanali
-  con più fasce al giorno, ferie e assenze (con avviso se ci sono appuntamenti nel periodo)
-- **Prestazioni**: durata, prezzo, medici abilitati, prenotabilità online
+- **Medici e orari**: dati del medico, colore in agenda, orari settimanali con più fasce al giorno,
+  ferie e assenze (con avviso se ci sono appuntamenti nel periodo)
+  - tabella **Prestazioni erogate** per medico, con durata e prezzo personalizzabili
+  - medico non più in servizio: **eliminazione** (se senza storico) o **archiviazione**, con annullamento
+    e avviso ai pazienti degli appuntamenti futuri
+- **Prestazioni**: categoria (es. Odontoiatria), durata, prezzo, medici abilitati, prenotabilità online
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**
 - `/prenota`: scelta prestazione → medico → giorno → orario → dati e consenso privacy
 - `/appuntamento/<codice>`: riepilogo e annullamento dal link ricevuto via email
 
-**Email automatiche**: conferma della prenotazione, promemoria (default 24 ore prima),
-avviso di annullamento o spostamento. Senza SMTP configurato le email vengono stampate nel log.
+**Messaggi automatici via email e WhatsApp**: conferma della prenotazione, promemoria il giorno prima
+della visita, avviso di spostamento o annullamento, con registro degli invii per ogni appuntamento.
+Configurazione: [docs/whatsapp.md](docs/whatsapp.md).
+
+## Aggiornare un'installazione esistente
+
+```bash
+git pull
+```
+```bash
+npm run install:all
+```
+```bash
+cd backend && npx prisma generate && npx prisma migrate deploy
+```
+```bash
+cd .. && npm run build && npm start
+```
 
 ## Tecnologie
 

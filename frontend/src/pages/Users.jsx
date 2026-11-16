@@ -61,7 +61,7 @@ function UserModal({ user, doctors, onClose, onSaved }) {
         <div className="grid2">
           <label>Ruolo<select value={f.role} onChange={set('role')}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           {f.role === 'MEDICO' && (
-            <label>Medico<select value={f.doctorId} onChange={set('doctorId')}><option value="">—</option>{doctors.map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}</select></label>
+            <label>Medico<select value={f.doctorId} onChange={set('doctorId')}><option value="">—</option>{doctors.filter((d) => !d.archivedAt || d.id === Number(f.doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}</select></label>
           )}
         </div>
         <label>{user.id ? 'Nuova password (lascia vuoto per non cambiarla)' : 'Password (min. 8 caratteri)'}<input type="password" autoComplete="new-password" value={f.password} onChange={set('password')} /></label>

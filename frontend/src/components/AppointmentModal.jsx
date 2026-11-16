@@ -4,7 +4,7 @@ import Modal from './Modal';
 import PatientPicker from './PatientPicker';
 import { api, errorMessage } from '../lib/api';
 import { DateTime, fmtTime, fmtDateTime } from '../lib/time';
-import { STATUS, doctorName } from '../lib/constants';
+import { STATUS, doctorName, groupByCategory, NOTIFICATION_KIND, NOTIFICATION_STATUS } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 
 /**
@@ -32,15 +32,20 @@ export default function AppointmentModal({ appointment, draft, doctors, services
   const [saving, setSaving] = useState(false);
 
   const doctor = doctors.find((d) => d.id === Number(doctorId));
-  const doctorServices = useMemo(
-    () => services.filter((s) => s.active && (!doctor || doctor.serviceIds.length === 0 || doctor.serviceIds.includes(s.id))),
-    [services, doctor],
-  );
+  // Prestazioni del medico con la durata personalizzata; se il medico non ne ha, tutte quelle attive
+  const doctorServices = useMemo(() => {
+    const links = doctor?.services || [];
+    if (!links.length) return services.filter((s) => s.active);
+    return links
+      .filter((l) => l.active || l.serviceId === Number(serviceId))
+      .map((l) => ({ id: l.serviceId, name: l.name, category: l.category, durationMin: l.durationMin ?? l.defaultDurationMin }));
+  }, [services, doctor, serviceId]);
+  const serviceGroups = groupByCategory(doctorServices);
 
-  // al cambio prestazione aggiorna la durata (solo se scelta dall'utente)
+  // al cambio prestazione aggiorna la durata
   const onService = (id) => {
     setServiceId(id);
-    const s = services.find((x) => x.id === Number(id));
+    const s = doctorServices.find((x) => x.id === Number(id));
     if (s) setDuration(s.durationMin);
   };
 
@@ -131,13 +136,17 @@ export default function AppointmentModal({ appointment, draft, doctors, services
         <div className="grid2">
           <label>Medico
             <select value={doctorId} disabled={readOnly} onChange={(e) => setDoctorId(Number(e.target.value))}>
-              {doctors.filter((d) => d.active || d.id === Number(doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
+              {doctors.filter((d) => (d.active && !d.archivedAt) || d.id === Number(doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
             </select>
           </label>
           <label>Prestazione
             <select value={serviceId} disabled={readOnly} onChange={(e) => onService(e.target.value)}>
               <option value="">— Nessuna —</option>
-              {doctorServices.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.durationMin} min)</option>)}
+              {Object.entries(serviceGroups).map(([cat, list]) => (
+                <optgroup key={cat} label={cat}>
+                  {list.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.durationMin} min)</option>)}
+                </optgroup>
+              ))}
             </select>
           </label>
           <label>Data<input type="date" value={date} disabled={readOnly} onChange={(e) => setDate(e.target.value)} /></label>
@@ -168,9 +177,66 @@ export default function AppointmentModal({ appointment, draft, doctors, services
           </label>
         )}
         <label>Note<textarea rows={3} value={notes} disabled={readOnly} onChange={(e) => setNotes(e.target.value)} /></label>
-        {isNew && <label className="check"><input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Invia email di conferma al paziente</label>}
+        {isNew && <label className="check"><input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Invia conferma al paziente (email e WhatsApp)</label>}
+        {!isNew && <NotificationLog appointment={appointment} readOnly={readOnly} />}
         {err && <div className="alert">{err}</div>}
       </div>
     </Modal>
+  );
+}
+
+/** Storico dei messaggi inviati al paziente per questo appuntamento, con reinvio manuale */
+function NotificationLog({ appointment, readOnly }) {
+  const [items, setItems] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    api(`/appointments/${appointment.id}`).then((a) => setItems(a.notifications || [])).catch(() => setItems([]));
+  }, [appointment.id]);
+
+  async function send(kind) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api(`/appointments/${appointment.id}/notify`, { method: 'POST', body: { kind } });
+      setItems(r.notifications);
+      setMsg({ ok: true, text: `Messaggio di ${NOTIFICATION_KIND[kind].toLowerCase()} inviato` });
+    } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); } finally { setBusy(false); }
+  }
+
+  const canSend = !readOnly && !['ANNULLATO', 'NON_PRESENTATO', 'COMPLETATO'].includes(appointment.status);
+
+  return (
+    <div className="notif-log">
+      <div className="page-head">
+        <div className="label">Messaggi al paziente</div>
+        {canSend && (
+          <div className="row">
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('CONFERMA')}>Reinvia conferma</button>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('PROMEMORIA')}>Invia promemoria ora</button>
+          </div>
+        )}
+      </div>
+      {!items ? <span className="muted small">Caricamento…</span> : items.length === 0 ? <span className="muted small">Nessun messaggio inviato.</span> : (
+        <table className="table table-compact">
+          <tbody>
+            {items.map((n) => (
+              <tr key={n.id}>
+                <td className="small">{fmtDateTime(n.createdAt)}</td>
+                <td className="small">{n.channel === 'WHATSAPP' ? 'WhatsApp' : 'Email'}</td>
+                <td className="small">{NOTIFICATION_KIND[n.kind]}</td>
+                <td className="small">{n.recipient}</td>
+                <td className="small" title={n.error || ''}>
+                  <span className="dot" style={{ background: NOTIFICATION_STATUS[n.status].color }} /> {NOTIFICATION_STATUS[n.status].label}
+                  {n.error && <div className="muted small">{n.error}</div>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {msg && <div className={msg.ok ? 'notice' : 'alert'}>{msg.text}</div>}
+    </div>
   );
 }

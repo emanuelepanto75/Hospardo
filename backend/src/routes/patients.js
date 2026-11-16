@@ -18,6 +18,7 @@ const patientSchema = z.object({
   notes: opt(z.string()),
   privacyConsent: z.boolean().optional(),
   remindersOptIn: z.boolean().optional(),
+  whatsappOptIn: z.boolean().optional(),
 });
 
 router.get('/', ah(async (req, res) => {
