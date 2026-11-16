@@ -70,7 +70,8 @@ Apri <http://localhost:5173>. Utenti di prova creati dal seed:
 
 La pagina di prenotazione pazienti è su <http://localhost:5173/prenota>.
 
-> Cambia subito le password e `JWT_SECRET` prima di usarlo con dati reali.
+> Prima di usarlo con dati reali esegui `npm run setup` nella cartella `backend`:
+> crea il tuo amministratore, genera `JWT_SECRET` e disattiva gli utenti di prova.
 > Per creare solo l'amministratore senza dati di esempio: `SEED_DEMO=false npm run db:seed`.
 
 ### Su Windows (PowerShell)
@@ -79,6 +80,11 @@ La pagina di prenotazione pazienti è su <http://localhost:5173/prenota>.
   `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, oppure usa `npm.cmd`.
 - Windows PowerShell 5 non accetta `&&`: esegui i comandi uno per riga.
 - Se la porta 4000 è già occupata, cambia `PORT` e `FRONTEND_URL` in `backend/.env`.
+
+## Accesso da internet
+
+Guida passo passo: [docs/pubblicazione-cloudflare.md](docs/pubblicazione-cloudflare.md)
+(Cloudflare Tunnel, creazione del tuo amministratore con `npm run setup`, sicurezza).
 
 ## Produzione
 

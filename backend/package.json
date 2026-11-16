@@ -12,7 +12,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "setup": "node scripts/setup.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -20,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.5.0",
     "node-cron": "^3.0.3",

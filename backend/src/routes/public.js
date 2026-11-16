@@ -10,20 +10,7 @@ const { ah, HttpError, notFound } = require('../lib/errors');
 const { getFreeSlots, assertFree, lockDoctor } = require('../services/availability');
 const { sendAppointmentEmail } = require('../services/mailer');
 const { DateTime, TZ } = require('../lib/time');
-
-// Limitazione semplice delle richieste di prenotazione per IP (anti-abuso)
-const hits = new Map();
-function rateLimit(max, windowMs) {
-  return (req, res, next) => {
-    const key = `${req.ip}:${req.path}`;
-    const now = Date.now();
-    const arr = (hits.get(key) || []).filter((t) => now - t < windowMs);
-    if (arr.length >= max) return next(new HttpError(429, 'Troppe richieste, riprova più tardi'));
-    arr.push(now);
-    hits.set(key, arr);
-    next();
-  };
-}
+const { rateLimit } = require('../lib/rateLimit');
 
 router.get('/info', (req, res) => res.json({ clinic: config.clinic, maxDaysAhead: config.onlineMaxDaysAhead }));
 
@@ -112,7 +99,7 @@ const bookSchema = z.object({
   privacyConsent: z.literal(true, { errorMap: () => ({ message: 'Il consenso privacy è obbligatorio' }) }),
 });
 
-router.post('/book', rateLimit(10, 60 * 60 * 1000), ah(async (req, res) => {
+router.post('/book', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
   const data = bookSchema.parse(req.body);
   const { service } = await loadBookable(data.doctorId, data.serviceId);
   const { notBefore } = bookingWindow();
@@ -200,7 +187,7 @@ const publicView = (a) => ({
 
 router.get('/appointment/:token', ah(async (req, res) => res.json(publicView(await byToken(req.params.token)))));
 
-router.post('/appointment/:token/cancel', rateLimit(20, 60 * 60 * 1000), ah(async (req, res) => {
+router.post('/appointment/:token/cancel', rateLimit({ max: 20, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
   const appt = await byToken(req.params.token);
   if (!publicView(appt).canCancel) throw new HttpError(400, 'Questo appuntamento non può essere annullato online');
   const updated = await prisma.appointment.update({

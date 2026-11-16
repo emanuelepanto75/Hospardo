@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const config = require('./lib/config');
@@ -9,6 +10,22 @@ const { startReminderScheduler } = require('./services/reminders');
 
 const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: null,
+    },
+  },
+  // HTTPS obbligatorio solo quando l'agenda è pubblicata (es. tramite tunnel Cloudflare)
+  strictTransportSecurity: config.isPublic,
+}));
 app.use(cors({ origin: config.frontendUrl }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -36,7 +53,8 @@ app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(config.port, () => {
-    console.log(`Hospardo API in ascolto su http://localhost:${config.port}`);
+    console.log(`Hospardo in ascolto su http://localhost:${config.port}`);
+    if (config.isPublic) console.log(`Indirizzo pubblico configurato: ${config.frontendUrl}`);
     if (process.env.DISABLE_REMINDERS !== 'true') startReminderScheduler();
   });
 }

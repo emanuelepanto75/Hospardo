@@ -25,8 +25,14 @@ const config = {
   onlineMaxDaysAhead: Number(process.env.ONLINE_MAX_DAYS_AHEAD || 90),
 };
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET deve essere impostato in produzione');
+const PLACEHOLDER_SECRETS = ['', 'cambia-questa-stringa-con-una-lunga-e-casuale'];
+const weakSecret = PLACEHOLDER_SECRETS.includes(process.env.JWT_SECRET || '') || (process.env.JWT_SECRET || '').length < 32;
+const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(config.frontendUrl);
+config.isPublic = !isLocal;
+
+if (weakSecret && (process.env.NODE_ENV === 'production' || !isLocal)) {
+  throw new Error('JWT_SECRET non impostato o troppo debole: esegui "npm run setup" nella cartella backend prima di pubblicare l\'agenda.');
 }
+if (weakSecret) console.warn('ATTENZIONE: JWT_SECRET di prova. Esegui "npm run setup" prima di usare dati reali.');
 
 module.exports = config;
