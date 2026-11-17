@@ -181,7 +181,7 @@ export default function AppointmentModal({ appointment, draft, doctors, services
           </label>
         )}
         <label>Note<textarea rows={3} value={notes} disabled={readOnly} onChange={(e) => setNotes(e.target.value)} /></label>
-        {isNew && <label className="check"><input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Invia conferma al paziente (email e WhatsApp)</label>}
+        {isNew && <label className="check"><input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Invia conferma automatica al paziente (email)</label>}
         {!isNew && <NotificationLog appointment={appointment} readOnly={readOnly} />}
         {err && <div className="alert">{err}</div>}
       </div>
