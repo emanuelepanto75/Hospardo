@@ -78,7 +78,19 @@ Il database viene aggiornato automaticamente a ogni avvio.
 | Vedere i log | `docker compose logs -f app` |
 | Fermare / riavviare | `docker compose stop` / `docker compose start` |
 | Dati di esempio | `docker compose run --rm app npm run db:seed` |
-| Backup del database | `docker compose exec -T db pg_dump -U postgres -Fc -f /tmp/backup.dump hospardo` poi `docker compose cp db:/tmp/backup.dump ./backup.dump` |
+| Backup immediato (oltre a quello automatico notturno) | `docker compose exec backup sh /backup.sh now` |
+
+**Backup automatico**: il servizio `backup` salva il database ogni notte alle 02:30 nella cartella `backups`
+del progetto e cancella i backup più vecchi di 30 giorni. Si configura nel file `.env` della cartella principale
+(non in `backend`):
+
+```
+BACKUP_TIME=02:30
+BACKUP_KEEP_DAYS=30
+BACKUP_DIR=C:/Users/nome/OneDrive/backup-hospardo
+```
+
+Con `BACKUP_DIR` in una cartella sincronizzata (OneDrive, Google Drive, Dropbox) si ha anche una copia fuori dal PC.
 
 Elenco completo dei comandi, con ripristino del backup e soluzione dei problemi: [docs/Hospardo-comandi.docx](docs/Hospardo-comandi.docx).
 
@@ -169,5 +181,5 @@ frontend/
 - Promemoria via SMS / WhatsApp
 - Trascinamento degli appuntamenti nell'agenda, vista mensile, stampa giornaliera
 - Lista d'attesa e appuntamenti ricorrenti
-- Registro delle modifiche (audit) e backup automatici
+- Registro delle modifiche (audit)
 - Fatturazione / ricevute e statistiche
