@@ -14,12 +14,13 @@ if (config.smtp.host) {
 const emailEnabled = () => !!transporter;
 
 /** Invia un'email. Se SMTP non è configurato la stampa nel log. Ritorna { status, providerId } */
-async function sendMail({ to, subject, text, html }) {
+async function sendMail({ to, subject, text, html, attachments }) {
   if (!transporter) {
-    console.log(`[email simulata] A: ${to}\nOggetto: ${subject}\n${text}\n`);
+    const att = attachments?.length ? `\nAllegati: ${attachments.map((a) => a.filename).join(', ')}` : '';
+    console.log(`[email simulata] A: ${to}\nOggetto: ${subject}\n${text}${att}\n`);
     return { status: 'SIMULATO' };
   }
-  const info = await transporter.sendMail({ from: config.smtp.from, to, subject, text, html });
+  const info = await transporter.sendMail({ from: config.smtp.from, to, subject, text, html, attachments });
   return { status: 'INVIATO', providerId: info.messageId };
 }
 

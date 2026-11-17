@@ -22,6 +22,12 @@ const config = {
   reminderMode: process.env.REMINDER_MODE === 'hours' ? 'hours' : 'day_before',
   reminderTime: process.env.REMINDER_TIME || '10:00',
   reminderHoursBefore: Number(process.env.REMINDER_HOURS_BEFORE || 24),
+  /// Riepilogo serale via email (Excel + calendario) dei prossimi giorni lavorativi
+  report: {
+    email: (process.env.REPORT_EMAIL || '').trim(),
+    time: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.REPORT_TIME || '') ? process.env.REPORT_TIME : '22:00',
+    days: Math.min(Math.max(Number(process.env.REPORT_DAYS) || 6, 1), 14),
+  },
   whatsapp: {
     /// "meta" (WhatsApp Cloud API), "twilio" oppure vuoto = disattivato (messaggi solo registrati)
     provider: (process.env.WHATSAPP_PROVIDER || '').toLowerCase(),

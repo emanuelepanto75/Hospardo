@@ -7,7 +7,7 @@ const config = require('../lib/config');
 const { formatLocal } = require('../lib/time');
 const { normalizePhone } = require('../lib/phone');
 const { sendMail } = require('./mailer');
-const { sendWhatsapp } = require('./whatsapp');
+const { sendWhatsapp, whatsappEnabled } = require('./whatsapp');
 
 const KINDS = ['CONFERMA', 'PROMEMORIA', 'ANNULLAMENTO', 'SPOSTAMENTO'];
 
@@ -74,6 +74,36 @@ function buildWhatsapp(appt, kind) {
   return { params, previewText };
 }
 
+/** Testo completo per WhatsApp "con un clic" (scritto dalla segreteria, nessun modello da approvare) */
+function buildWhatsappText(appt, kind) {
+  const d = details(appt);
+  const head = {
+    CONFERMA: `Gentile ${d.firstName}, le confermiamo l'appuntamento presso ${config.clinic.name}:`,
+    PROMEMORIA: `Gentile ${d.firstName}, le ricordiamo l'appuntamento presso ${config.clinic.name}:`,
+    SPOSTAMENTO: `Gentile ${d.firstName}, il suo appuntamento presso ${config.clinic.name} è stato spostato:`,
+    ANNULLAMENTO: `Gentile ${d.firstName}, il suo appuntamento presso ${config.clinic.name} è stato annullato:`,
+  }[kind];
+  const lines = [
+    head,
+    `📅 ${d.when}`,
+    `🩺 ${d.service} – ${d.doctor}`,
+    config.clinic.address && kind !== 'ANNULLAMENTO' ? `📍 ${config.clinic.address}` : null,
+    '',
+    kind === 'ANNULLAMENTO'
+      ? `Per prenotare di nuovo può rispondere a questo messaggio${config.clinic.phone ? ` o chiamare lo ${config.clinic.phone}` : ''}.`
+      : `Se non può venire, la preghiamo di avvisarci rispondendo a questo messaggio o da qui: ${d.manageUrl}`,
+  ];
+  return lines.filter((l) => l !== null).join('\n');
+}
+
+/** Link wa.me che apre WhatsApp sulla chat del paziente con il messaggio già scritto (null se manca il cellulare) */
+function whatsappLink(appt, kind) {
+  const phone = normalizePhone(appt.patient.phone, config.whatsapp.defaultCountryCode);
+  if (!phone) return null;
+  const text = buildWhatsappText(appt, kind);
+  return { phone: `+${phone}`, text, url: `https://wa.me/${phone}?text=${encodeURIComponent(text)}` };
+}
+
 async function log(appointmentId, channel, kind, recipient, result, error) {
   await prisma.notification.create({
     data: {
@@ -115,8 +145,9 @@ async function notifyAppointment(apptOrId, kind) {
     }
   }
 
+  // WhatsApp automatico solo se configurato; altrimenti si usa l'invio "con un clic" dall'agenda
   const phone = normalizePhone(p.phone, config.whatsapp.defaultCountryCode);
-  if (phone && p.whatsappOptIn) {
+  if (phone && p.whatsappOptIn && whatsappEnabled()) {
     try {
       const r = await sendWhatsapp({ to: phone, kind, ...buildWhatsapp(appt, kind) });
       await log(appt.id, 'WHATSAPP', kind, `+${phone}`, r);
@@ -134,4 +165,4 @@ async function notifyAppointment(apptOrId, kind) {
   return out;
 }
 
-module.exports = { notifyAppointment, buildEmail, buildWhatsapp, KINDS };
+module.exports = { notifyAppointment, buildEmail, buildWhatsapp, buildWhatsappText, whatsappLink, log, KINDS };

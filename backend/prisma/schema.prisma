@@ -45,6 +45,7 @@ enum NotificationStatus {
   INVIATO
   SIMULATO // canale non configurato: messaggio solo registrato nel log
   ERRORE
+  MANUALE // WhatsApp aperto con un clic dalla segreteria (invio confermato dall'operatore)
 }
 
 /// Utente che accede al gestionale (segreteria, medici, amministratori)

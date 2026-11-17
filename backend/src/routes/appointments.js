@@ -4,11 +4,12 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { getFreeSlots, assertFree, lockDoctor, isWithinWorkingHours } = require('../services/availability');
-const { notifyAppointment } = require('../services/notify');
+const { notifyAppointment, whatsappLink, log: logNotification } = require('../services/notify');
+const { DateTime, TZ, dayBounds } = require('../lib/time');
 const { durationFor } = require('../services/catalog');
 
 const include = {
-  patient: { select: { id: true, firstName: true, lastName: true, phone: true, email: true, fiscalCode: true, remindersOptIn: true } },
+  patient: { select: { id: true, firstName: true, lastName: true, phone: true, email: true, fiscalCode: true, remindersOptIn: true, whatsappOptIn: true } },
   doctor: { select: { id: true, title: true, firstName: true, lastName: true, color: true } },
   service: { select: { id: true, name: true, durationMin: true, color: true } },
 };
@@ -38,6 +39,14 @@ const updateSchema = z.object({
   status: z.enum(STATUSES).optional(),
   force: z.boolean().optional(),
 });
+
+const WA_KINDS = ['CONFERMA', 'PROMEMORIA', 'SPOSTAMENTO', 'ANNULLAMENTO'];
+/** Link WhatsApp "con un clic" per ogni tipo di messaggio (null se il paziente non ha un cellulare valido) */
+function whatsappLinks(appt) {
+  const out = {};
+  for (const k of WA_KINDS) out[k] = whatsappLink(appt, k);
+  return out;
+}
 
 /** I medici possono gestire solo la propria agenda */
 function assertCanEdit(user, doctorId) {
@@ -73,13 +82,46 @@ router.get('/availability', ah(async (req, res) => {
   res.json(slots);
 }));
 
+/** Elenco per i promemoria WhatsApp con un clic: appuntamenti di un giorno (default: il prossimo giorno lavorativo) */
+router.get('/reminders', ah(async (req, res) => {
+  let date = req.query.date;
+  if (!date) {
+    let d = DateTime.now().setZone(TZ).plus({ days: 1 });
+    if (d.weekday === 7) d = d.plus({ days: 1 }); // la domenica lo studio è chiuso
+    date = d.toISODate();
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'Data non valida');
+  const { start, end } = dayBounds(date);
+  const items = await prisma.appointment.findMany({
+    where: {
+      start: { gte: start, lt: end },
+      status: { in: ['PRENOTATO', 'CONFERMATO'] },
+      ...(req.user.role === 'MEDICO' && req.query.mine === '1' ? { doctorId: req.user.doctorId } : {}),
+    },
+    include: {
+      ...include,
+      notifications: { where: { kind: 'PROMEMORIA', status: { in: ['INVIATO', 'MANUALE', 'SIMULATO'] } }, orderBy: { createdAt: 'desc' } },
+    },
+    orderBy: [{ start: 'asc' }],
+  });
+  res.json({
+    date,
+    items: items.map(({ notifications, ...a }) => ({
+      ...a,
+      whatsapp: whatsappLink({ ...a, doctor: a.doctor, patient: a.patient }, 'PROMEMORIA'),
+      whatsappSentAt: notifications.find((n) => n.channel === 'WHATSAPP' && n.status !== 'SIMULATO')?.createdAt ?? null,
+      emailReminder: notifications.find((n) => n.channel === 'EMAIL')?.status ?? null,
+    })),
+  });
+}));
+
 router.get('/:id', ah(async (req, res) => {
   const appt = await prisma.appointment.findUnique({
     where: { id: Number(req.params.id) },
     include: { ...include, notifications: { orderBy: { createdAt: 'desc' } } },
   });
   if (!appt) throw notFound('Appuntamento');
-  res.json(appt);
+  res.json({ ...appt, whatsappLinks: whatsappLinks(appt) });
 }));
 
 router.post('/', ah(async (req, res) => {
@@ -119,7 +161,7 @@ router.post('/', ah(async (req, res) => {
   });
 
   if (data.sendEmail !== false) await notifyAppointment(appt.id, 'CONFERMA');
-  res.status(201).json(appt);
+  res.status(201).json({ ...appt, whatsappLinks: whatsappLinks(appt) });
 }));
 
 router.put('/:id', ah(async (req, res) => {
@@ -169,7 +211,20 @@ router.put('/:id', ah(async (req, res) => {
   } else if (moved && !['ANNULLATO', 'NON_PRESENTATO', 'COMPLETATO'].includes(appt.status)) {
     await notifyAppointment(id, 'SPOSTAMENTO');
   }
-  res.json(appt);
+  res.json({ ...appt, whatsappLinks: whatsappLinks(appt) });
+}));
+
+/** Registra che la segreteria ha aperto WhatsApp con il messaggio pronto (invio con un clic) */
+router.post('/:id/whatsapp', ah(async (req, res) => {
+  const { kind } = z.object({ kind: z.enum(WA_KINDS) }).parse(req.body);
+  const appt = await prisma.appointment.findUnique({ where: { id: Number(req.params.id) }, include: { patient: true, doctor: true, service: true } });
+  if (!appt) throw notFound('Appuntamento');
+  assertCanEdit(req.user, appt.doctorId);
+  const link = whatsappLink(appt, kind);
+  if (!link) throw new HttpError(400, 'Il paziente non ha un numero di cellulare valido');
+  await logNotification(appt.id, 'WHATSAPP', kind, link.phone, { status: 'MANUALE' });
+  const notifications = await prisma.notification.findMany({ where: { appointmentId: appt.id }, orderBy: { createdAt: 'desc' } });
+  res.json({ notifications });
 }));
 
 /** Invio manuale di un messaggio al paziente (es. reinvio conferma o promemoria) */
@@ -180,7 +235,7 @@ router.post('/:id/notify', ah(async (req, res) => {
   assertCanEdit(req.user, appt.doctorId);
   if (['ANNULLATO', 'NON_PRESENTATO'].includes(appt.status)) throw new HttpError(400, 'Appuntamento annullato: nessun messaggio inviato');
   const result = await notifyAppointment(appt.id, kind);
-  if (!result.email && !result.whatsapp) throw new HttpError(400, 'Il paziente non ha email o cellulare, oppure ha rifiutato i messaggi');
+  if (!result.email && !result.whatsapp) throw new HttpError(400, 'Nessun messaggio automatico inviato: il paziente non ha email (o l\'ha rifiutata) e WhatsApp automatico non è attivo. Usa il pulsante WhatsApp.');
   const notifications = await prisma.notification.findMany({ where: { appointmentId: appt.id }, orderBy: { createdAt: 'desc' } });
   res.json({ result, notifications });
 }));

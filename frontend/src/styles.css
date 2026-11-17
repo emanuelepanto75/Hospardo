@@ -136,7 +136,8 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
 .calendar { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: auto; max-height: calc(100vh - 190px); }
 .cal-head, .cal-body { display: grid; grid-template-columns: 56px repeat(var(--cols), minmax(150px, 1fr)); }
 .cal-head { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--border); }
-.cal-col-head { padding: 8px 10px; border-left: 1px solid var(--border); border-top: 3px solid transparent; text-transform: capitalize; }
+.cal-col-head { padding: 8px 10px; border-left: 1px solid var(--border); border-top: 3px solid transparent; }
+.cal-col-head.is-day { text-transform: capitalize; }
 .cal-col-head.today { background: var(--primary-soft); }
 .cal-col-title { font-weight: 600; font-size: .92rem; }
 .cal-gutter { position: relative; }
@@ -234,3 +235,15 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
 .notif-log .page-head .label { margin: 0; }
 .option-group + .option-group { margin-top: 12px; }
 .option-group-title { font-size: .8rem; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+
+/* ---- WhatsApp con un clic ---- */
+.btn-wa { background: #25d366; border-color: #1ebe5b; color: #fff; font-weight: 600; text-decoration: none !important; display: inline-flex; align-items: center; gap: 6px; }
+.btn-wa:hover:not(:disabled) { background: #1ebe5b; }
+.wa-row { gap: 8px; }
+.wa-notice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #e8f8ee; border: 1px solid #b7e8c8; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.wa-notice > span { flex: 1; min-width: 220px; }
+.wa-done { color: #15803d; font-size: .88rem; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wa-done .btn-wa { background: #fff; color: #15803d; border-color: #b7e8c8; }
+.table tr.row-done td { background: #f6fcf8; }
+
+.toolbar-group input[type=date] { width: auto; }

@@ -7,6 +7,7 @@ const config = require('./lib/config');
 const { requireAuth } = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
 const { startReminderScheduler } = require('./services/reminders');
+const { startReportScheduler } = require('./services/agendaReport');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -40,6 +41,7 @@ app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/patients', require('./routes/patients').router);
 app.use('/api/appointments', require('./routes/appointments'));
+app.use('/api/reports', require('./routes/reports'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint non trovato' }));
 
 // In produzione il backend serve anche il frontend compilato
@@ -55,7 +57,10 @@ if (require.main === module) {
   app.listen(config.port, () => {
     console.log(`Hospardo in ascolto su http://localhost:${config.port}`);
     if (config.isPublic) console.log(`Indirizzo pubblico configurato: ${config.frontendUrl}`);
-    if (process.env.DISABLE_REMINDERS !== 'true') startReminderScheduler();
+    if (process.env.DISABLE_REMINDERS !== 'true') {
+      startReminderScheduler();
+      startReportScheduler();
+    }
   });
 }
 

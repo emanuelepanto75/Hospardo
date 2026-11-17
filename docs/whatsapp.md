@@ -16,6 +16,22 @@ reinviare la conferma o mandare subito un promemoria.
 Il paziente riceve i messaggi solo se ha dato il consenso: nella sua scheda ci sono le opzioni
 "Invia conferme e promemoria via email" e "… su WhatsApp". Nella prenotazione online lo sceglie lui.
 
+## WhatsApp con un clic (gratuito, attivo di default)
+
+Finché WhatsApp automatico non è configurato, Hospardo prepara i messaggi e la segreteria li invia
+dal numero WhatsApp dello studio (app WhatsApp o WhatsApp Business su PC o telefono):
+
+- **dopo ogni prenotazione, spostamento o annullamento** compare in agenda un avviso con il pulsante verde
+  per mandare subito il messaggio;
+- nella scheda dell'appuntamento ci sono i pulsanti WhatsApp **Conferma**, **Promemoria** e **Avvisa spostamento**
+  (o **Avvisa annullamento**);
+- la pagina **Promemoria** elenca i pazienti del giorno lavorativo successivo, ciascuno con il pulsante
+  **Invia promemoria** e la spunta "inviato alle …".
+
+Il pulsante apre `https://wa.me/<numero>` con il testo già scritto: basta premere Invio in WhatsApp.
+È la funzione ufficiale "click to chat": nessun costo e nessun rischio di blocco del numero.
+Nello storico dell'appuntamento l'invio compare come "Aperto in WhatsApp dalla segreteria".
+
 ## Orario del promemoria
 
 In `backend/.env`:
@@ -25,7 +41,7 @@ REMINDER_MODE=day_before
 REMINDER_TIME="10:00"
 ```
 
-Il giorno prima della visita, dalle 10:00 in poi, partono i promemoria per gli appuntamenti del giorno dopo.
+Il giorno prima della visita, dalle 10:00 in poi, partono i promemoria email (e WhatsApp, se automatico) per gli appuntamenti del giorno dopo.
 Prima di quell'ora non si invia niente, così nessuno riceve messaggi di notte.
 Chi ha prenotato da meno di 6 ore non riceve il promemoria, perché ha appena ricevuto la conferma.
 
@@ -43,7 +59,7 @@ SMTP_PASS="password-per-le-app"
 MAIL_FROM="Studio Medico <tuoindirizzo@gmail.com>"
 ```
 
-## WhatsApp
+## WhatsApp automatico (a pagamento)
 
 WhatsApp permette a un'azienda di scrivere per prima a un cliente solo con **modelli di messaggio
 approvati** (template). Servono quindi un account WhatsApp Business API e 3–4 modelli approvati.
@@ -128,5 +144,4 @@ Il modello di annullamento usa `{{5}}` come link: punta alla pagina dell'appunta
 può aprire una nuova prenotazione. Se `WHATSAPP_TEMPLATE_SPOSTAMENTO` è vuoto si usa quello di conferma.
 
 Dopo aver modificato `.env` riavvia il server (`npm start`).
-Finché `WHATSAPP_PROVIDER` è vuoto, i messaggi WhatsApp vengono solo registrati
-come "Non inviato (canale non configurato)": puoi provare tutto senza spendere nulla.
+Finché `WHATSAPP_PROVIDER` è vuoto resta attivo l'invio con un clic descritto sopra.

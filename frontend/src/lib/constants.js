@@ -26,4 +26,5 @@ export const NOTIFICATION_STATUS = {
   INVIATO: { label: 'Inviato', color: '#16a34a' },
   SIMULATO: { label: 'Non inviato (canale non configurato)', color: '#64748b' },
   ERRORE: { label: 'Errore', color: '#dc2626' },
+  MANUALE: { label: 'Aperto in WhatsApp dalla segreteria', color: '#25d366' },
 };

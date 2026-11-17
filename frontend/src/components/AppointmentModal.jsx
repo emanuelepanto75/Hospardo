@@ -6,6 +6,7 @@ import { api, errorMessage } from '../lib/api';
 import { DateTime, fmtTime, fmtDateTime } from '../lib/time';
 import { STATUS, doctorName, groupByCategory, NOTIFICATION_KIND, NOTIFICATION_STATUS } from '../lib/constants';
 import { useAuth } from '../lib/auth';
+import WhatsAppButton from './WhatsAppButton';
 
 /**
  * Creazione / modifica di un appuntamento.
@@ -65,7 +66,9 @@ export default function AppointmentModal({ appointment, draft, doctors, services
       const saved = isNew
         ? await api('/appointments', { method: 'POST', body: { doctorId: Number(doctorId), patientId: patient.id, serviceId: serviceId ? Number(serviceId) : null, start, end, notes: notes || null, sendEmail, force } })
         : await api(`/appointments/${appointment.id}`, { method: 'PUT', body: { doctorId: Number(doctorId), serviceId: serviceId ? Number(serviceId) : null, start, end, notes: notes || null, status, force, ...extra } });
-      onSaved(saved);
+      // dopo il salvataggio si propone di avvisare il paziente su WhatsApp
+      const moved = !isNew && (saved.doctorId !== appointment.doctorId || +new Date(saved.start) !== +new Date(appointment.start));
+      onSaved(saved, isNew ? 'CONFERMA' : moved && !['ANNULLATO', 'NON_PRESENTATO', 'COMPLETATO'].includes(saved.status) ? 'SPOSTAMENTO' : null);
     } catch (e) {
       if ((e.status === 422 || e.status === 409) && !force) {
         if (window.confirm(`${e.message}.\n\nVuoi inserire comunque l'appuntamento (es. urgenza / fuori orario)?`)) {
@@ -83,7 +86,8 @@ export default function AppointmentModal({ appointment, draft, doctors, services
     if (s === 'ANNULLATO' && !window.confirm('Annullare l\'appuntamento? Il paziente riceverà un\'email di avviso se ha un indirizzo email.')) return;
     setSaving(true);
     try {
-      onSaved(await api(`/appointments/${appointment.id}`, { method: 'PUT', body: { status: s } }));
+      const saved = await api(`/appointments/${appointment.id}`, { method: 'PUT', body: { status: s } });
+      onSaved(saved, s === 'ANNULLATO' ? 'ANNULLAMENTO' : null);
     } catch (e) {
       setErr(errorMessage(e));
       setSaving(false);
@@ -188,11 +192,12 @@ export default function AppointmentModal({ appointment, draft, doctors, services
 /** Storico dei messaggi inviati al paziente per questo appuntamento, con reinvio manuale */
 function NotificationLog({ appointment, readOnly }) {
   const [items, setItems] = useState(null);
+  const [full, setFull] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    api(`/appointments/${appointment.id}`).then((a) => setItems(a.notifications || [])).catch(() => setItems([]));
+    api(`/appointments/${appointment.id}`).then((a) => { setFull(a); setItems(a.notifications || []); }).catch(() => setItems([]));
   }, [appointment.id]);
 
   async function send(kind) {
@@ -206,6 +211,11 @@ function NotificationLog({ appointment, readOnly }) {
   }
 
   const canSend = !readOnly && !['ANNULLATO', 'NON_PRESENTATO', 'COMPLETATO'].includes(appointment.status);
+  const waProps = full && {
+    appointmentId: appointment.id,
+    optIn: full.patient.whatsappOptIn,
+    onLogged: (r) => setItems(r.notifications),
+  };
 
   return (
     <div className="notif-log">
@@ -213,11 +223,25 @@ function NotificationLog({ appointment, readOnly }) {
         <div className="label">Messaggi al paziente</div>
         {canSend && (
           <div className="row">
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('CONFERMA')}>Reinvia conferma</button>
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('PROMEMORIA')}>Invia promemoria ora</button>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('CONFERMA')}>Reinvia email di conferma</button>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => send('PROMEMORIA')}>Email promemoria ora</button>
           </div>
         )}
       </div>
+      {!readOnly && waProps && (
+        <div className="row wa-row">
+          <span className="small muted">WhatsApp:</span>
+          {appointment.status === 'ANNULLATO' ? (
+            <WhatsAppButton {...waProps} link={full.whatsappLinks.ANNULLAMENTO} kind="ANNULLAMENTO" label="Avvisa annullamento" />
+          ) : canSend ? (
+            <>
+              <WhatsAppButton {...waProps} link={full.whatsappLinks.CONFERMA} kind="CONFERMA" label="Conferma" />
+              <WhatsAppButton {...waProps} link={full.whatsappLinks.PROMEMORIA} kind="PROMEMORIA" label="Promemoria" />
+              <WhatsAppButton {...waProps} link={full.whatsappLinks.SPOSTAMENTO} kind="SPOSTAMENTO" label="Avvisa spostamento" />
+            </>
+          ) : <span className="small muted">nessun messaggio per questo stato</span>}
+        </div>
+      )}
       {!items ? <span className="muted small">Caricamento…</span> : items.length === 0 ? <span className="muted small">Nessun messaggio inviato.</span> : (
         <table className="table table-compact">
           <tbody>

@@ -6,6 +6,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const links = [
     { to: '/agenda', label: 'Agenda', icon: '📅' },
+    { to: '/promemoria', label: 'Promemoria', icon: '💬' },
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
     { to: '/prestazioni', label: 'Prestazioni', icon: '📋' },

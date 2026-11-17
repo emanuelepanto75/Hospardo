@@ -4,6 +4,8 @@ import { useAuth } from '../lib/auth';
 import { DateTime, hmToMin, minToHm } from '../lib/time';
 import { STATUS, doctorName } from '../lib/constants';
 import AppointmentModal from '../components/AppointmentModal';
+import WhatsAppButton from '../components/WhatsAppButton';
+import { download, errorMessage } from '../lib/api';
 
 const PX_PER_MIN = 1.3;
 const SNAP = 15;
@@ -49,6 +51,8 @@ export default function Agenda() {
   const [weekDoctor, setWeekDoctor] = useState(() => readPref('agenda.weekDoctor', user.doctorId ?? null));
   const [showCancelled, setShowCancelled] = useState(false);
   const [modal, setModal] = useState(null);
+  const [waNotice, setWaNotice] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const [now, setNow] = useState(DateTime.now());
 
   const { data: doctors } = useApi('/doctors');
@@ -185,9 +189,17 @@ export default function Agenda() {
             <button className={view === 'day' ? 'on' : ''} onClick={() => setView('day')}>Giorno</button>
             <button className={view === 'week' ? 'on' : ''} onClick={() => setView('week')}>Settimana</button>
           </div>
+          {user.role !== 'MEDICO' && (
+            <button className="btn" disabled={exporting} title="Excel degli appuntamenti dei prossimi 6 giorni (domenica esclusa)"
+              onClick={() => { setExporting(true); download('/reports/agenda.xlsx', 'agenda.xlsx').catch((e) => alert(errorMessage(e))).finally(() => setExporting(false)); }}>
+              {exporting ? 'Preparazione…' : 'Excel 6 giorni'}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => setModal({ draft: { doctorId: view === 'week' ? weekDoc?.id : dayDoctors[0]?.id, start: date.set({ hour: 9 }).toISO() } })}>+ Appuntamento</button>
         </div>
       </div>
+
+      {waNotice && <WaNotice {...waNotice} onClose={() => setWaNotice(null)} />}
 
       <div className="doctor-filter">
         {view === 'day'
@@ -207,7 +219,7 @@ export default function Agenda() {
         <div className="cal-head">
           <div className="cal-gutter" />
           {columns.map((c) => (
-            <div key={c.key} className={`cal-col-head ${view === 'week' && isToday(c.date) ? 'today' : ''}`} style={{ borderTopColor: c.doctor.color }}>
+            <div key={c.key} className={`cal-col-head ${view === 'week' ? 'is-day' : ''} ${view === 'week' && isToday(c.date) ? 'today' : ''}`} style={{ borderTopColor: c.doctor.color }}>
               <div className="cal-col-title">{c.title}</div>
               {c.sub && <div className="muted small">{c.sub}</div>}
             </div>
@@ -273,10 +285,36 @@ export default function Agenda() {
           doctors={doctors}
           services={services}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); reload(); }}
+          onSaved={(saved, waKind) => {
+            setModal(null);
+            reload();
+            setWaNotice(waKind ? { appt: saved, kind: waKind } : null);
+          }}
         />
       )}
     </div>
   );
 }
 
+
+const WA_NOTICE_TEXT = {
+  CONFERMA: { done: 'prenotato', action: 'Invia conferma su WhatsApp' },
+  SPOSTAMENTO: { done: 'spostato', action: 'Avvisa su WhatsApp' },
+  ANNULLAMENTO: { done: 'annullato', action: "Avvisa dell'annullamento su WhatsApp" },
+};
+
+/** Avviso dopo il salvataggio, con il pulsante per mandare il messaggio WhatsApp al paziente */
+function WaNotice({ appt, kind, onClose }) {
+  const t = WA_NOTICE_TEXT[kind];
+  const link = appt.whatsappLinks?.[kind];
+  return (
+    <div className="wa-notice" role="status">
+      <span>
+        Appuntamento di <b>{appt.patient.lastName} {appt.patient.firstName}</b> {t.done}
+        {' '}({DateTime.fromISO(appt.start).toFormat("ccc d LLL 'ore' HH:mm")}).
+      </span>
+      <WhatsAppButton appointmentId={appt.id} link={link} kind={kind} label={t.action} optIn={appt.patient.whatsappOptIn} onLogged={onClose} />
+      <button className="icon-btn" aria-label="Chiudi" onClick={onClose}>×</button>
+    </div>
+  );
+}

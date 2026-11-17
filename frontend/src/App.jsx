@@ -9,6 +9,7 @@ import Doctors from './pages/Doctors';
 import DoctorDetail from './pages/DoctorDetail';
 import Services from './pages/Services';
 import Users from './pages/Users';
+import Reminders from './pages/Reminders';
 import Book from './pages/Book';
 import ManageAppointment from './pages/ManageAppointment';
 
@@ -20,6 +21,7 @@ function Private() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/promemoria" element={<Reminders />} />
         <Route path="/pazienti" element={<Patients />} />
         <Route path="/pazienti/:id" element={<PatientDetail />} />
         <Route path="/medici" element={<Doctors />} />

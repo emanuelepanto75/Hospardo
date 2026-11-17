@@ -45,3 +45,23 @@ export function errorMessage(err) {
   }
   return err?.message || 'Errore imprevisto';
 }
+
+/** Scarica un file da un endpoint protetto (con il token di accesso) */
+export async function download(path, fallbackName) {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new ApiError(res.status, data);
+  }
+  const blob = await res.blob();
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

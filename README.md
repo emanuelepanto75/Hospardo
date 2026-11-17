@@ -25,9 +25,18 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
 - `/prenota`: scelta prestazione → medico → giorno → orario → dati e consenso privacy
 - `/appuntamento/<codice>`: riepilogo e annullamento dal link ricevuto via email
 
-**Messaggi automatici via email e WhatsApp**: conferma della prenotazione, promemoria il giorno prima
-della visita, avviso di spostamento o annullamento, con registro degli invii per ogni appuntamento.
-Configurazione: [docs/whatsapp.md](docs/whatsapp.md).
+**Messaggi ai pazienti**: email automatiche (conferma, promemoria il giorno prima, spostamento, annullamento)
+e WhatsApp **con un clic** dal numero dello studio, gratuito: avviso dopo ogni prenotazione e pagina
+**Promemoria** con i pazienti del giorno dopo. WhatsApp completamente automatico è attivabile
+con Meta o Twilio. Registro degli invii per ogni appuntamento. Dettagli: [docs/whatsapp.md](docs/whatsapp.md).
+
+**Riepilogo serale via email**: ogni sera (default 22:00) un'email all'indirizzo `REPORT_EMAIL` con
+gli appuntamenti dei prossimi 6 giorni lavorativi, domenica esclusa:
+- file **Excel** con una scheda di riepilogo (appuntamenti per giorno e medico, assenze) e una scheda per giorno
+  (ora, fine, medico, paziente, telefono, prestazione, stato, note, orari ancora liberi di ogni medico);
+- file **calendario .ics** da importare in Outlook o Google Calendar.
+
+Lo stesso Excel si scarica dall'agenda con il pulsante **Excel 6 giorni**.
 
 ## Aggiornare un'installazione esistente
 
