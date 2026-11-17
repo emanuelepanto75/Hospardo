@@ -78,7 +78,9 @@ Il database viene aggiornato automaticamente a ogni avvio.
 | Vedere i log | `docker compose logs -f app` |
 | Fermare / riavviare | `docker compose stop` / `docker compose start` |
 | Dati di esempio | `docker compose run --rm app npm run db:seed` |
-| Backup del database | `docker compose exec db pg_dump -U postgres hospardo > backup.sql` |
+| Backup del database | `docker compose exec -T db pg_dump -U postgres -Fc -f /tmp/backup.dump hospardo` poi `docker compose cp db:/tmp/backup.dump ./backup.dump` |
+
+Elenco completo dei comandi, con ripristino del backup e soluzione dei problemi: [docs/Hospardo-comandi.docx](docs/Hospardo-comandi.docx).
 
 I dati stanno nel volume Docker `pgdata` e restano anche dopo `docker compose down`
 (non usare `docker compose down -v`, che li cancella).

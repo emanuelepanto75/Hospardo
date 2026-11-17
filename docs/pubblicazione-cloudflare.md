@@ -116,8 +116,7 @@ La pagina per i pazienti è `https://…/prenota`.
 - **Protezione extra (consigliata con dati sanitari)**: con Cloudflare Access puoi chiedere un codice via
   email prima ancora del login. Crea un'applicazione Access su `agenda.tuodominio.it` e aggiungi una regola
   *Bypass* per i percorsi pubblici: `/prenota`, `/appuntamento/*`, `/api/public/*`, `/assets/*`.
-- **Backup** del database regolarmente, ad esempio:
-  `docker exec hospardo-db-1 pg_dump -U postgres hospardo > backup.sql`
-  (il nome del container si vede con `docker ps`).
+- **Backup** del database regolarmente: vedi la sezione "Backup e ripristino" di `docs/Hospardo-comandi.docx`
+  (in PowerShell non usare `pg_dump ... > backup.sql`: il file risulterebbe non ripristinabile).
 - Il PC deve restare acceso e con `npm start` in esecuzione: per l'avvio automatico all'accensione
   si può installare il server come servizio di Windows (es. con NSSM).
