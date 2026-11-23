@@ -301,6 +301,7 @@ function DoctorServices({ doctor, services, readOnly, onSaved }) {
 
 /** Archiviazione / eliminazione del medico */
 function DoctorStatus({ doctor, onChanged, onDeleted }) {
+  const { user } = useAuth();
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
   const run = async (fn) => { setBusy(true); setMsg(null); try { await fn(); } catch (e) { setMsg(errorMessage(e)); } finally { setBusy(false); } };
@@ -320,14 +321,41 @@ function DoctorStatus({ doctor, onChanged, onDeleted }) {
     await api(`/doctors/${doctor.id}`, { method: 'DELETE' });
     onDeleted();
   });
+  // solo amministratore principale: elimina anche tutti gli appuntamenti del medico (es. dati di prova)
+  const removeWithHistory = () => run(async () => {
+    const typed = window.prompt(
+      `ATTENZIONE: verranno eliminati definitivamente ${doctorName(doctor)} e tutti i suoi ${doctor.appointmentsTotal} appuntamenti, `
+      + `che spariranno anche dalle schede dei pazienti. L'operazione non si può annullare.\n\nPer confermare scrivi il cognome del medico: ${doctor.lastName}`,
+    );
+    if (typed === null) return;
+    await api(`/doctors/${doctor.id}`, { method: 'DELETE', query: { withHistory: 1, confirm: typed } });
+    onDeleted();
+  });
+  const inactive = !!doctor.archivedAt || !doctor.active;
 
   return (
     <div className="card form danger-zone">
       <h2>Medico non più in servizio</h2>
-      {doctor.archivedAt ? (
+      {inactive ? (
         <>
-          <p className="small">Il medico è archiviato. Puoi riattivarlo se torna a lavorare nella struttura (ricorda di controllare orari e prenotabilità online).</p>
-          <div className="row-end"><button className="btn" disabled={busy} onClick={restore}>Riattiva medico</button></div>
+          <p className="small">
+            Il medico è {doctor.archivedAt ? 'archiviato' : 'disattivato'}. Puoi riattivarlo se torna a lavorare nella struttura
+            (ricorda di controllare orari e prenotabilità online).
+            {doctor.appointmentsTotal > 0 && <> Ha {doctor.appointmentsTotal} appuntamenti nello storico.</>}
+          </p>
+          {doctor.appointmentsTotal > 0 && user.role === 'SUPERADMIN' && (
+            <p className="small muted">
+              Se si tratta di un medico di prova puoi eliminarlo insieme ai suoi appuntamenti. Non farlo per un medico reale:
+              lo storico delle visite dei pazienti andrebbe perso.
+            </p>
+          )}
+          <div className="row-end">
+            {doctor.appointmentsTotal === 0 && <button className="btn btn-danger" disabled={busy} onClick={remove}>Elimina medico</button>}
+            {doctor.appointmentsTotal > 0 && user.role === 'SUPERADMIN' && (
+              <button className="btn btn-danger" disabled={busy} onClick={removeWithHistory}>Elimina con lo storico</button>
+            )}
+            <button className="btn" disabled={busy} onClick={restore}>Riattiva medico</button>
+          </div>
         </>
       ) : doctor.appointmentsTotal > 0 ? (
         <>

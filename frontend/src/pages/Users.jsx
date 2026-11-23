@@ -47,6 +47,12 @@ function UserModal({ user, doctors, onClose, onSaved }) {
   const [err, setErr] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
 
+  async function remove() {
+    if (!window.confirm(`Eliminare definitivamente l'utente ${user.name} (${user.email})?`)) return;
+    setErr(null);
+    try { await api(`/users/${user.id}`, { method: 'DELETE' }); onSaved(); } catch (e) { setErr(errorMessage(e)); }
+  }
+
   async function save() {
     setErr(null);
     const body = { name: f.name, email: f.email, role: f.role, active: f.active, doctorId: f.role === 'MEDICO' && f.doctorId ? Number(f.doctorId) : null };
@@ -60,7 +66,12 @@ function UserModal({ user, doctors, onClose, onSaved }) {
 
   return (
     <Modal title={user.id ? 'Modifica utente' : 'Nuovo utente'} onClose={onClose}
-      footer={<><button className="btn btn-ghost" onClick={onClose}>Annulla</button><button className="btn btn-primary" onClick={save}>Salva</button></>}>
+      footer={<>
+        {user.id && !user.active && !isSelf && (
+          <button className="btn btn-danger" style={{ marginRight: 'auto' }} onClick={remove}>Elimina utente</button>
+        )}
+        <button className="btn btn-ghost" onClick={onClose}>Annulla</button><button className="btn btn-primary" onClick={save}>Salva</button>
+      </>}>
       <div className="form">
         <label>Nome<input value={f.name} onChange={set('name')} autoFocus /></label>
         <label>Email<input type="email" value={f.email} onChange={set('email')} /></label>

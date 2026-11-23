@@ -154,17 +154,33 @@ router.post('/:id/restore', requireRole('ADMIN'), ah(async (req, res) => {
 }));
 
 /** Eliminazione definitiva: consentita solo se il medico non ha mai avuto appuntamenti */
+/**
+ * Eliminazione definitiva. Senza appuntamenti: consentita agli amministratori.
+ * Con appuntamenti (es. medici di prova): solo l'amministratore principale, solo per medici
+ * disattivati o archiviati, e confermando con il cognome (`confirm`). Cancella anche i loro appuntamenti.
+ */
 router.delete('/:id', requireRole('ADMIN'), ah(async (req, res) => {
   const id = Number(req.params.id);
+  const doctor = await prisma.doctor.findUnique({ where: { id } });
+  if (!doctor) throw notFound('Medico');
   const count = await prisma.appointment.count({ where: { doctorId: id } });
   if (count) {
-    throw new HttpError(409, `Il medico ha ${count} appuntamenti nello storico: non può essere eliminato, ma puoi archiviarlo`);
+    if (req.query.withHistory !== '1') {
+      throw new HttpError(409, `Il medico ha ${count} appuntamenti nello storico: non può essere eliminato, ma puoi archiviarlo`);
+    }
+    if (req.user.role !== 'SUPERADMIN') throw new HttpError(403, 'Solo l\'amministratore principale può eliminare un medico con il suo storico');
+    if (doctor.active && !doctor.archivedAt) throw new HttpError(400, 'Archivia o disattiva il medico prima di eliminarlo');
+    if (String(req.query.confirm || '').trim().toLowerCase() !== doctor.lastName.trim().toLowerCase()) {
+      throw new HttpError(400, 'Conferma non valida: scrivi il cognome del medico');
+    }
   }
   await prisma.$transaction([
+    // le notifiche degli appuntamenti si cancellano a cascata
+    prisma.appointment.deleteMany({ where: { doctorId: id } }),
     prisma.user.updateMany({ where: { doctorId: id }, data: { doctorId: null, active: false } }),
     prisma.doctor.delete({ where: { id } }),
   ]);
-  res.status(204).end();
+  res.json({ deletedAppointments: count });
 }));
 
 // ---- Orari settimanali ----

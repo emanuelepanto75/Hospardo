@@ -73,4 +73,16 @@ router.put('/:id', ah(async (req, res) => {
   res.json({ ...publicUser(user), active: user.active });
 }));
 
+/** Eliminazione definitiva di un utente già disattivato */
+router.delete('/:id', ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) throw new HttpError(404, 'Utente non trovato');
+  if (id === req.user.id) throw new HttpError(400, 'Non puoi eliminare il tuo stesso utente');
+  assertCanManage(req.user, target);
+  if (target.active) throw new HttpError(400, 'Disattiva l\'utente prima di eliminarlo');
+  await prisma.user.delete({ where: { id } });
+  res.status(204).end();
+}));
+
 module.exports = router;
