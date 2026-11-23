@@ -10,7 +10,7 @@ export const STATUS = {
 export const ROLES = { SUPERADMIN: 'Amministratore principale', ADMIN: 'Amministratore', SEGRETERIA: 'Segreteria', MEDICO: 'Medico' };
 export const isAdmin = (user) => !!user && (user.role === 'SUPERADMIN' || user.role === 'ADMIN');
 
-export const doctorName = (d) => (d ? `${d.title || ''} ${d.firstName} ${d.lastName}`.trim() : '');
+export const doctorName = (d) => (d ? [d.title, d.firstName, d.lastName].filter(Boolean).join(' ') : '');
 export const patientName = (p) => (p ? `${p.lastName} ${p.firstName}` : '');
 
 /** Raggruppa le prestazioni per categoria (le non categorizzate in fondo) */

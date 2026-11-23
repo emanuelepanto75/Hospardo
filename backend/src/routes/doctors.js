@@ -6,7 +6,7 @@ const { requireRole, isAdmin } = require('../middleware/auth');
 const { hmToMin } = require('../lib/time');
 
 const doctorSchema = z.object({
-  firstName: z.string().min(1),
+  firstName: z.string().trim(),
   lastName: z.string().min(1),
   title: z.string().optional(),
   specialty: z.string().nullable().optional(),

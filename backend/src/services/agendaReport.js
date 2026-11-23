@@ -16,7 +16,7 @@ const STATUS_LABEL = {
 const ACTIVE = ['PRENOTATO', 'CONFERMATO', 'IN_ATTESA', 'COMPLETATO'];
 const MIN_FREE_MIN = 15; // fasce libere più corte non vengono riportate
 
-const docName = (d) => `${d.title || ''} ${d.firstName} ${d.lastName}`.trim();
+const docName = (d) => [d.title, d.firstName, d.lastName].filter(Boolean).join(' ');
 const hm = (date) => DateTime.fromJSDate(date).setZone(TZ).toFormat('HH:mm');
 
 /** I prossimi `count` giorni a partire da domani, saltando la domenica (date ISO, ora dello studio) */

@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
     "setup": "node scripts/setup.js",
-    "report:send": "node scripts/send-report.js"
+    "report:send": "node scripts/send-report.js",
+    "import:tariffario": "node scripts/import-tariffario.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

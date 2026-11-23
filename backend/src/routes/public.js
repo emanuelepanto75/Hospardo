@@ -203,7 +203,7 @@ const publicView = (a) => ({
   end: a.end,
   status: a.status,
   service: a.service?.name ?? null,
-  doctor: `${a.doctor.title} ${a.doctor.firstName} ${a.doctor.lastName}`,
+  doctor: [a.doctor.title, a.doctor.firstName, a.doctor.lastName].filter(Boolean).join(' '),
   patient: `${a.patient.firstName} ${a.patient.lastName}`,
   canCancel: ['PRENOTATO', 'CONFERMATO'].includes(a.status) && a.start > new Date(),
   clinic: config.clinic,

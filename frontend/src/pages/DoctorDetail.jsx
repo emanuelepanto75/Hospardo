@@ -67,7 +67,7 @@ function DoctorForm({ initial, readOnly, onSaved }) {
       <fieldset disabled={readOnly}>
         <div className="grid3">
           <label>Titolo<select value={f.title} onChange={set('title')}><option>Dott.</option><option>Dott.ssa</option><option>Prof.</option><option>Prof.ssa</option><option value="">—</option></select></label>
-          <label>Nome *<input required value={f.firstName} onChange={set('firstName')} /></label>
+          <label>Nome<input value={f.firstName} onChange={set('firstName')} /></label>
           <label>Cognome *<input required value={f.lastName} onChange={set('lastName')} /></label>
           <label>Specializzazione<input value={f.specialty} onChange={set('specialty')} /></label>
           <label>Email<input type="email" value={f.email} onChange={set('email')} /></label>
