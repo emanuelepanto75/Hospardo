@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { ah, HttpError, notFound } = require('../lib/errors');
-const { requireRole } = require('../middleware/auth');
+const { requireRole, isAdmin } = require('../middleware/auth');
 const { hmToMin } = require('../lib/time');
 
 const doctorSchema = z.object({
@@ -45,7 +45,7 @@ const out = (d) => ({
 
 /** Il medico può modificare solo i propri orari/assenze; admin e segreteria tutti */
 function canManageDoctor(user, doctorId) {
-  return user.role === 'ADMIN' || user.role === 'SEGRETERIA' || user.doctorId === doctorId;
+  return isAdmin(user) || user.role === 'SEGRETERIA' || user.doctorId === doctorId;
 }
 
 /** Aggiorna l'elenco delle prestazioni di un medico mantenendo le personalizzazioni esistenti */

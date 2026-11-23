@@ -23,13 +23,20 @@ async function requireAuth(req, res, next) {
   }
 }
 
-const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) return next(new HttpError(403, 'Permessi insufficienti'));
-  next();
+const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
+const isAdmin = (user) => !!user && ADMIN_ROLES.includes(user.role);
+
+/** Ruoli ammessi. 'ADMIN' comprende anche l'amministratore principale (SUPERADMIN). */
+const requireRole = (...roles) => {
+  const allowed = roles.includes('ADMIN') ? [...roles, 'SUPERADMIN'] : roles;
+  return (req, res, next) => {
+    if (!req.user || !allowed.includes(req.user.role)) return next(new HttpError(403, 'Permessi insufficienti'));
+    next();
+  };
 };
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
 }
 
-module.exports = { requireAuth, requireRole, signToken };
+module.exports = { requireAuth, requireRole, signToken, isAdmin, ADMIN_ROLES };

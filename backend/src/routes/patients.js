@@ -47,6 +47,8 @@ router.get('/:id', ah(async (req, res) => {
     where: { id: Number(req.params.id) },
     include: {
       appointments: {
+        // il medico vede solo gli appuntamenti con sé
+        where: req.user.role === 'MEDICO' ? { doctorId: req.user.doctorId ?? -1 } : undefined,
         orderBy: { start: 'desc' },
         include: { doctor: { select: { id: true, title: true, firstName: true, lastName: true, color: true } }, service: { select: { id: true, name: true } } },
       },

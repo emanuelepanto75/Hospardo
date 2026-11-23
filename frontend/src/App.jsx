@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth';
+import { isAdmin } from './lib/constants';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Agenda from './pages/Agenda';
@@ -27,7 +28,7 @@ function Private() {
         <Route path="/medici" element={<Doctors />} />
         <Route path="/medici/:id" element={<DoctorDetail />} />
         <Route path="/prestazioni" element={<Services />} />
-        {user.role === 'ADMIN' && <Route path="/utenti" element={<Users />} />}
+        {isAdmin(user) && <Route path="/utenti" element={<Users />} />}
         <Route path="*" element={<Navigate to="/agenda" replace />} />
       </Route>
     </Routes>

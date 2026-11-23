@@ -140,7 +140,7 @@ export default function AppointmentModal({ appointment, draft, doctors, services
         <div className="grid2">
           <label>Medico
             <select value={doctorId} disabled={readOnly} onChange={(e) => setDoctorId(Number(e.target.value))}>
-              {doctors.filter((d) => (d.active && !d.archivedAt) || d.id === Number(doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
+              {doctors.filter((d) => ((d.active && !d.archivedAt) || d.id === Number(doctorId)) && (user.role !== 'MEDICO' || d.id === user.doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
             </select>
           </label>
           <label>Prestazione

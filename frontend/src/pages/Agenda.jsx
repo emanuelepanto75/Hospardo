@@ -63,7 +63,11 @@ export default function Agenda() {
   useEffect(() => { if (weekDoctor) writePref('agenda.weekDoctor', weekDoctor); }, [weekDoctor]);
   useEffect(() => { const t = setInterval(() => setNow(DateTime.now()), 60000); return () => clearInterval(t); }, []);
 
-  const activeDoctors = useMemo(() => (doctors || []).filter((d) => d.active), [doctors]);
+  // il medico vede solo la propria agenda
+  const activeDoctors = useMemo(
+    () => (doctors || []).filter((d) => d.active && (user.role !== 'MEDICO' || d.id === user.doctorId)),
+    [doctors, user.role, user.doctorId],
+  );
   const dayDoctors = useMemo(() => {
     const ids = selected ?? (user.doctorId ? [user.doctorId] : activeDoctors.map((d) => d.id));
     const list = activeDoctors.filter((d) => ids.includes(d.id));

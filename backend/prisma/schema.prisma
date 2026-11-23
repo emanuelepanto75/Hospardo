@@ -10,7 +10,8 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
+  SUPERADMIN // amministratore principale: unico che gestisce gli altri amministratori
+  ADMIN      // amministratore di secondo livello
   SEGRETERIA
   MEDICO
 }

@@ -3,7 +3,7 @@ import { api, errorMessage } from '../lib/api';
 import { useApi } from '../lib/useApi';
 import { useAuth } from '../lib/auth';
 import { euro } from '../lib/time';
-import { doctorName, groupByCategory } from '../lib/constants';
+import { doctorName, groupByCategory, isAdmin as isAdminUser } from '../lib/constants';
 import Modal from '../components/Modal';
 
 export default function Services() {
@@ -11,7 +11,7 @@ export default function Services() {
   const { data: services, reload } = useApi('/services');
   const { data: doctors } = useApi('/doctors');
   const [edit, setEdit] = useState(null);
-  const isAdmin = user.role === 'ADMIN';
+  const isAdmin = isAdminUser(user);
 
   return (
     <div className="page">

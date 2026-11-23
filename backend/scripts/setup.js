@@ -54,7 +54,7 @@ async function main() {
   const prisma = new PrismaClient();
 
   try {
-    console.log('\nCrea il tuo utente amministratore.');
+    console.log('\nCrea il tuo utente amministratore principale.');
     let email = '';
     while (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) email = (await ask('Email: ')).toLowerCase();
     let name = '';
@@ -72,10 +72,10 @@ async function main() {
     const existing = await prisma.user.findUnique({ where: { email } });
     await prisma.user.upsert({
       where: { email },
-      update: { name, passwordHash, role: 'ADMIN', active: true },
-      create: { email, name, passwordHash, role: 'ADMIN' },
+      update: { name, passwordHash, role: 'SUPERADMIN', active: true },
+      create: { email, name, passwordHash, role: 'SUPERADMIN' },
     });
-    console.log(existing ? `Utente ${email} aggiornato come amministratore.` : `Utente amministratore ${email} creato.`);
+    console.log(existing ? `Utente ${email} aggiornato come amministratore principale.` : `Amministratore principale ${email} creato.`);
 
     const demo = await prisma.user.findMany({ where: { email: { endsWith: '@studio.local' }, active: true, NOT: { email } } });
     if (demo.length) {

@@ -17,7 +17,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
-    create: { email: adminEmail, name: 'Amministratore', role: 'ADMIN', passwordHash: await bcrypt.hash(adminPassword, 10) },
+    create: { email: adminEmail, name: 'Amministratore', role: 'SUPERADMIN', passwordHash: await bcrypt.hash(adminPassword, 10) },
   });
   console.log(`Utente amministratore: ${adminEmail} / ${adminPassword}`);
 

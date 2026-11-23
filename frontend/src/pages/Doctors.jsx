@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApi } from '../lib/useApi';
 import { useAuth } from '../lib/auth';
 import { WEEKDAYS } from '../lib/time';
-import { doctorName } from '../lib/constants';
+import { doctorName, isAdmin } from '../lib/constants';
 
 export default function Doctors() {
   const { user } = useAuth();
@@ -18,7 +18,7 @@ export default function Doctors() {
         <h1>Medici e orari</h1>
         <div className="row">
           {archivedCount > 0 && <label className="check small"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> mostra archiviati ({archivedCount})</label>}
-          {user.role === 'ADMIN' && <button className="btn btn-primary" onClick={() => nav('/medici/nuovo')}>+ Nuovo medico</button>}
+          {isAdmin(user) && <button className="btn btn-primary" onClick={() => nav('/medici/nuovo')}>+ Nuovo medico</button>}
         </div>
       </div>
       {!doctors ? <p className="muted">Caricamento…</p> : list.length === 0 ? <div className="empty">Nessun medico inserito.</div> : (

@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { ROLES } from '../lib/constants';
+import { ROLES, isAdmin } from '../lib/constants';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -10,7 +10,7 @@ export default function Layout() {
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
     { to: '/prestazioni', label: 'Prestazioni', icon: '📋' },
-    ...(user.role === 'ADMIN' ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }] : []),
+    ...(isAdmin(user) ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }] : []),
   ];
   return (
     <div className="app">

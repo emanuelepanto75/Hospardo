@@ -7,7 +7,8 @@ export const STATUS = {
   NON_PRESENTATO: { label: 'Non presentato', color: '#7c3aed' },
 };
 
-export const ROLES = { ADMIN: 'Amministratore', SEGRETERIA: 'Segreteria', MEDICO: 'Medico' };
+export const ROLES = { SUPERADMIN: 'Amministratore principale', ADMIN: 'Amministratore', SEGRETERIA: 'Segreteria', MEDICO: 'Medico' };
+export const isAdmin = (user) => !!user && (user.role === 'SUPERADMIN' || user.role === 'ADMIN');
 
 export const doctorName = (d) => (d ? `${d.title || ''} ${d.firstName} ${d.lastName}`.trim() : '');
 export const patientName = (p) => (p ? `${p.lastName} ${p.firstName}` : '');

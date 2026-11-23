@@ -4,7 +4,7 @@ import { api, errorMessage } from '../lib/api';
 import { useApi } from '../lib/useApi';
 import { useAuth } from '../lib/auth';
 import { DateTime, WEEKDAYS, fmtDateTime, euro } from '../lib/time';
-import { doctorName, groupByCategory } from '../lib/constants';
+import { doctorName, groupByCategory, isAdmin as isAdminUser } from '../lib/constants';
 
 const emptyDoctor = { title: 'Dott.', firstName: '', lastName: '', specialty: '', email: '', phone: '', color: '#2563eb', bio: '', active: true, bookableOnline: true, slotStepMin: 15 };
 
@@ -15,7 +15,7 @@ export default function DoctorDetail() {
   const { user } = useAuth();
   const { data: services } = useApi('/services');
   const { data: doctor, reload } = useApi(isNew ? null : `/doctors/${id}`);
-  const isAdmin = user.role === 'ADMIN';
+  const isAdmin = isAdminUser(user);
   const canManage = isAdmin || user.role === 'SEGRETERIA' || user.doctorId === Number(id);
 
   if (!isNew && !doctor) return <div className="page"><p className="muted">Caricamento…</p></div>;

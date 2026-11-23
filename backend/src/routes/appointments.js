@@ -64,6 +64,8 @@ router.get('/', ah(async (req, res) => {
   }).parse(req.query);
   const where = { start: { lt: to }, end: { gt: from } };
   if (doctorId) where.doctorId = doctorId;
+  // il medico vede solo i propri appuntamenti
+  if (req.user.role === 'MEDICO') where.doctorId = req.user.doctorId ?? -1;
   if (status) where.status = { in: status.split(',') };
   const items = await prisma.appointment.findMany({ where, include, orderBy: { start: 'asc' } });
   res.json(items);
@@ -96,7 +98,7 @@ router.get('/reminders', ah(async (req, res) => {
     where: {
       start: { gte: start, lt: end },
       status: { in: ['PRENOTATO', 'CONFERMATO'] },
-      ...(req.user.role === 'MEDICO' && req.query.mine === '1' ? { doctorId: req.user.doctorId } : {}),
+      ...(req.user.role === 'MEDICO' ? { doctorId: req.user.doctorId ?? -1 } : {}),
     },
     include: {
       ...include,
@@ -121,6 +123,7 @@ router.get('/:id', ah(async (req, res) => {
     include: { ...include, notifications: { orderBy: { createdAt: 'desc' } } },
   });
   if (!appt) throw notFound('Appuntamento');
+  if (req.user.role === 'MEDICO' && appt.doctorId !== req.user.doctorId) throw new HttpError(403, 'Puoi vedere solo i tuoi appuntamenti');
   res.json({ ...appt, whatsappLinks: whatsappLinks(appt) });
 }));
 
