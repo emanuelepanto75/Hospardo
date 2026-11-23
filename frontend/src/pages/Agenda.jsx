@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApi } from '../lib/useApi';
 import { useAuth } from '../lib/auth';
 import { DateTime, hmToMin, minToHm } from '../lib/time';
@@ -199,6 +200,10 @@ export default function Agenda() {
               {exporting ? 'Preparazione…' : 'Excel 6 giorni'}
             </button>
           )}
+          <Link className="btn" title="Stampa o PDF della settimana di un medico"
+            to={`/stampa/settimana?${new URLSearchParams({ ...((view === 'week' ? weekDoc : dayDoctors.length === 1 ? dayDoctors[0] : null) ? { doctorId: String((view === 'week' ? weekDoc : dayDoctors[0]).id) } : {}), date: date.toISODate() })}`}>
+            Stampa settimana
+          </Link>
           <button className="btn btn-primary" onClick={() => setModal({ draft: { doctorId: view === 'week' ? weekDoc?.id : dayDoctors[0]?.id, start: date.set({ hour: 9 }).toISO() } })}>+ Appuntamento</button>
         </div>
       </div>

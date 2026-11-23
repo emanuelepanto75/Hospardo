@@ -11,6 +11,7 @@ import DoctorDetail from './pages/DoctorDetail';
 import Services from './pages/Services';
 import Users from './pages/Users';
 import Reminders from './pages/Reminders';
+import PrintWeek from './pages/PrintWeek';
 import Book from './pages/Book';
 import ManageAppointment from './pages/ManageAppointment';
 
@@ -20,6 +21,7 @@ function Private() {
   if (!user) return <Login />;
   return (
     <Routes>
+      <Route path="/stampa/settimana" element={<PrintWeek />} />
       <Route element={<Layout />}>
         <Route path="/agenda" element={<Agenda />} />
         <Route path="/promemoria" element={<Reminders />} />

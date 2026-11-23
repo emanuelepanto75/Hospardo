@@ -43,6 +43,7 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/patients', require('./routes/patients').router);
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/prints', require('./routes/prints'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint non trovato' }));
 
 // In produzione il backend serve anche il frontend compilato

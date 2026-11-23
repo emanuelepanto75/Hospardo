@@ -247,3 +247,38 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
 .table tr.row-done td { background: #f6fcf8; }
 
 .toolbar-group input[type=date] { width: auto; }
+
+/* ---- Stampa settimanale del medico ---- */
+.print-page { max-width: 1120px; margin: 0 auto; padding: 16px; }
+.print-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.print-toolbar select { width: auto; min-width: 260px; }
+.print-sheet { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 24px 28px; box-shadow: var(--shadow); color: #1f2937; }
+.print-head { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 10px; }
+.print-head span:first-child { font-weight: 700; color: #0f2f3a; text-transform: uppercase; }
+.print-sheet h1 { font-size: 1.35rem; margin: 4px 0 2px; color: #0f2f3a; }
+.print-sub { color: var(--muted); font-size: .88rem; margin: 0 0 12px; }
+.print-day { margin-top: 14px; }
+.print-day h2 { font-size: 1rem; color: var(--primary); margin: 0 0 4px; }
+.print-day h2 small { font-weight: 400; color: var(--muted); font-size: .78rem; margin-left: 10px; }
+.print-none { font-style: italic; color: var(--muted); font-size: .85rem; margin: 0 0 4px 4px; }
+.print-table { width: 100%; border-collapse: collapse; font-size: .8rem; table-layout: fixed; }
+.print-table td { overflow-wrap: anywhere; }
+.print-table th { background: #e0f2f7; text-align: left; padding: 4px 6px; font-weight: 700; color: #0f2f3a; }
+.print-table td { padding: 4px 6px; border-bottom: 1px solid #e3e7ee; vertical-align: top; }
+.print-table .right { text-align: right; white-space: nowrap; }
+.print-free td { color: #15803d; font-style: italic; padding: 2px 6px; }
+.print-noshow td { color: var(--muted); text-decoration: line-through; }
+.print-total { margin-top: 14px; border-top: 2px solid #0f2f3a; padding-top: 6px; text-align: right; display: flex; flex-direction: column; gap: 2px; }
+.print-total span { font-size: .72rem; color: var(--muted); }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-page { padding: 0; max-width: none; }
+  .print-sheet { border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+  .print-day { break-inside: avoid; page-break-inside: avoid; }
+  .print-table thead { display: table-header-group; }
+  .print-table tr { break-inside: avoid; }
+  .print-table th, .print-free td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
