@@ -9,6 +9,11 @@ const config = {
     name: process.env.CLINIC_NAME || 'Studio Medico',
     address: process.env.CLINIC_ADDRESS || '',
     phone: process.env.CLINIC_PHONE || '',
+    // mostrati nella pagina web pubblica
+    email: process.env.CLINIC_EMAIL || '',
+    hours: process.env.CLINIC_HOURS || '',
+    description: process.env.CLINIC_DESCRIPTION || '',
+    showPrices: process.env.SITE_SHOW_PRICES !== 'false',
   },
   smtp: {
     host: process.env.SMTP_HOST || '',

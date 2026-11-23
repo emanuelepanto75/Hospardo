@@ -10,7 +10,8 @@ const { startReminderScheduler } = require('./services/reminders');
 const { startReportScheduler } = require('./services/agendaReport');
 
 const app = express();
-app.set('trust proxy', 1);
+// Dietro tunnel Cloudflare e Caddy: l'indirizzo del visitatore è il primo non privato in X-Forwarded-For
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 app.disable('x-powered-by');
 app.use(helmet({
   contentSecurityPolicy: {

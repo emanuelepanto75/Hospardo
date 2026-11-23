@@ -1,0 +1,66 @@
+# Hospardo – smistamento degli indirizzi (servizio "caddy" di docker-compose).
+# HTTPS e certificati li gestisce Cloudflare: il tunnel porta qui le richieste in http.
+#
+#   https://DOMINIO        pagina web pubblica (cartella site)
+#   https://www.DOMINIO    rimanda a https://DOMINIO
+#   https://app.DOMINIO    agenda: area riservata e prenotazione pazienti (/prenota)
+#   http://localhost:4180  anteprima della pagina web da questo PC
+#
+# DOMINIO si imposta con HOSPARDO_DOMAIN nel file .env della cartella principale.
+{
+	auto_https off
+	admin off
+	servers {
+		# il tunnel arriva dalla rete interna di Docker: conserva l'indirizzo originale del visitatore
+		trusted_proxies static private_ranges
+	}
+}
+
+(sicurezza) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+(sito) {
+	import sicurezza
+	# dati pubblici dell'agenda mostrati nella pagina (contatti, prestazioni, medici): solo lettura
+	@dati_pubblici {
+		method GET
+		path /api/public/info /api/public/services /api/public/doctors
+	}
+	handle @dati_pubblici {
+		reverse_proxy app:4100
+	}
+	handle {
+		root * /srv/sito
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+http://app.{$HOSPARDO_DOMAIN} {
+	import sicurezza
+	reverse_proxy app:4100
+}
+
+http://www.{$HOSPARDO_DOMAIN} {
+	redir https://{$HOSPARDO_DOMAIN}{uri} permanent
+}
+
+http://{$HOSPARDO_DOMAIN} {
+	import sito
+}
+
+http://localhost {
+	import sito
+}
+
+# qualsiasi altro indirizzo: non trovato
+http:// {
+	respond "Non trovato" 404
+}

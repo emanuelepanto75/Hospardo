@@ -159,8 +159,9 @@ La pagina di prenotazione pazienti è su <http://localhost:5173/prenota>.
 
 ## Accesso da internet
 
-Guida passo passo: [docs/pubblicazione-cloudflare.md](docs/pubblicazione-cloudflare.md)
-(Cloudflare Tunnel, creazione del tuo amministratore con `npm run setup`, sicurezza).
+Come per CivicAlerts: pagina web pubblica su `https://DOMINIO` (cartella `site`), agenda su
+`https://app.DOMINIO`, smistati da Caddy e pubblicati con un tunnel Cloudflare dedicato (servizi `caddy`
+e `cloudflared` di docker-compose). Guida passo passo: [docs/PUBBLICAZIONE.md](docs/PUBBLICAZIONE.md).
 
 ## Produzione
 

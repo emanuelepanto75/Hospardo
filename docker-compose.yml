@@ -55,5 +55,36 @@ services:
       - ${BACKUP_DIR:-./backups}:/backups
     entrypoint: ["sh", "/backup.sh"]
 
+  # Smista pagina web (DOMINIO) e agenda (app.DOMINIO); anteprima su http://localhost:4180
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      HOSPARDO_DOMAIN: ${HOSPARDO_DOMAIN:-hospardo.local}
+    ports:
+      - "127.0.0.1:${HOSPARDO_SITE_PORT:-4180}:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/sito:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Tunnel Cloudflare dedicato a Hospardo: pubblica pagina e agenda senza aprire porte sul router.
+  # Si attiva con COMPOSE_PROFILES=tunnel e CLOUDFLARE_TUNNEL_TOKEN nel file .env principale.
+  # Vedi docs/PUBBLICAZIONE.md.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    depends_on:
+      - caddy
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

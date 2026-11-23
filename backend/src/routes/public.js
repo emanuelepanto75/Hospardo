@@ -15,6 +15,9 @@ const { rateLimit } = require('../lib/rateLimit');
 
 router.get('/info', (req, res) => res.json({ clinic: config.clinic, maxDaysAhead: config.onlineMaxDaysAhead }));
 
+/** Nasconde i prezzi nelle risposte pubbliche se SITE_SHOW_PRICES=false */
+const priceless = (list) => (config.clinic.showPrices ? list : list.map(({ priceCents, ...x }) => x));
+
 router.get('/services', ah(async (req, res) => {
   const services = await prisma.service.findMany({
     where: {
@@ -25,7 +28,7 @@ router.get('/services', ah(async (req, res) => {
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
     select: { id: true, name: true, category: true, description: true, durationMin: true, priceCents: true },
   });
-  res.json(services);
+  res.json(priceless(services));
 }));
 
 router.get('/doctors', ah(async (req, res) => {
@@ -42,11 +45,11 @@ router.get('/doctors', ah(async (req, res) => {
       services: serviceId ? { where: { serviceId }, include: { service: true } } : false,
     },
   });
-  res.json(doctors.map(({ services, ...d }) => {
+  res.json(priceless(doctors.map(({ services, ...d }) => {
     if (!services?.length) return d;
     const e = effective(services[0]);
     return { ...d, durationMin: e.durationMin, priceCents: e.priceCents };
-  }));
+  })));
 }));
 
 async function loadBookable(doctorId, serviceId) {
