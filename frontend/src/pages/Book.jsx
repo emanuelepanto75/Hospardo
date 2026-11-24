@@ -6,6 +6,12 @@ import { doctorName, groupByCategory } from '../lib/constants';
 
 const STRIP_DAYS = 7;
 
+/** "45 min · 120,00 €": mostra solo ciò che lo studio rende pubblico */
+function meta(durationMin, priceCents, prefix = '') {
+  const parts = [durationMin != null ? `${durationMin} min` : null, priceCents != null ? euro(priceCents) : null].filter(Boolean);
+  return parts.length ? prefix + parts.join(' · ') : '';
+}
+
 export default function Book() {
   const [info, setInfo] = useState(null);
   const [services, setServices] = useState(null);
@@ -73,7 +79,7 @@ export default function Book() {
 
       <section className="step">
         <div className="step-head"><span className="step-n">1</span> Prestazione {service && <button className="link" onClick={() => reset(1)}>cambia</button>}</div>
-        {service ? <div className="step-value">{service.name} <span className="muted">· {(doctor?.durationMin ?? service.durationMin)} min {(doctor?.priceCents ?? service.priceCents) != null && `· ${euro(doctor?.priceCents ?? service.priceCents)}`}</span></div> : (
+        {service ? <div className="step-value">{service.name} <span className="muted">{meta(doctor?.durationMin ?? service.durationMin, doctor?.priceCents ?? service.priceCents, '· ')}</span></div> : (
           <div>
             {!services && <p className="muted">Caricamento…</p>}
             {services?.length === 0 && <p className="muted">Al momento non ci sono prestazioni prenotabili online.</p>}
@@ -84,7 +90,7 @@ export default function Book() {
                   {list.map((s) => (
                     <button key={s.id} className="option" onClick={() => setService(s)}>
                       <b>{s.name}</b>
-                      <span className="muted small">{s.durationMin} min{s.priceCents != null && ` · ${euro(s.priceCents)}`}</span>
+                      {meta(s.durationMin, s.priceCents) && <span className="muted small">{meta(s.durationMin, s.priceCents)}</span>}
                       {s.description && <span className="small">{s.description}</span>}
                     </button>
                   ))}
@@ -105,8 +111,8 @@ export default function Book() {
                 <button key={d.id} className="option" style={{ borderLeftColor: d.color }} onClick={() => setDoctor(d)}>
                   <b>{doctorName(d)}</b>
                   <span className="muted small">{d.specialty}</span>
-                  {(d.durationMin !== service.durationMin || d.priceCents !== service.priceCents) && (
-                    <span className="small">{d.durationMin} min{d.priceCents != null && ` · ${euro(d.priceCents)}`}</span>
+                  {(d.durationMin !== service.durationMin || d.priceCents !== service.priceCents) && meta(d.durationMin, d.priceCents) && (
+                    <span className="small">{meta(d.durationMin, d.priceCents)}</span>
                   )}
                   {d.bio && <span className="small">{d.bio}</span>}
                 </button>

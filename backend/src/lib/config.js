@@ -14,6 +14,7 @@ const config = {
     hours: process.env.CLINIC_HOURS || '',
     description: process.env.CLINIC_DESCRIPTION || '',
     showPrices: process.env.SITE_SHOW_PRICES !== 'false',
+    showDurations: process.env.SITE_SHOW_DURATIONS !== 'false',
   },
   smtp: {
     host: process.env.SMTP_HOST || '',

@@ -213,7 +213,7 @@
       var grid = el('div', { class: 'grid' }, groups[cat].map(function (s) {
         return el('div', { class: 'card' }, [
           el('b', { text: s.name }),
-          el('div', { class: 'meta', text: s.durationMin + ' minuti' }),
+          s.durationMin != null ? el('div', { class: 'meta', text: s.durationMin + ' minuti' }) : null,
           s.description ? el('p', { text: s.description }) : null,
           s.priceCents != null ? el('div', { class: 'price', text: euro(s.priceCents) }) : null,
         ]);

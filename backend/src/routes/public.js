@@ -15,8 +15,12 @@ const { rateLimit } = require('../lib/rateLimit');
 
 router.get('/info', (req, res) => res.json({ clinic: config.clinic, maxDaysAhead: config.onlineMaxDaysAhead }));
 
-/** Nasconde i prezzi nelle risposte pubbliche se SITE_SHOW_PRICES=false */
-const priceless = (list) => (config.clinic.showPrices ? list : list.map(({ priceCents, ...x }) => x));
+/** Nasconde prezzi (SITE_SHOW_PRICES=false) e durate (SITE_SHOW_DURATIONS=false) nelle risposte pubbliche */
+const priceless = (list) => list.map(({ priceCents, durationMin, ...x }) => ({
+  ...x,
+  ...(config.clinic.showPrices ? { priceCents } : {}),
+  ...(config.clinic.showDurations ? { durationMin } : {}),
+}));
 
 router.get('/services', ah(async (req, res) => {
   const services = await prisma.service.findMany({
