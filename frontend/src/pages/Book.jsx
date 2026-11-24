@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { DateTime, euro, fmtTime } from '../lib/time';
 import { doctorName, groupByCategory } from '../lib/constants';
@@ -23,6 +22,8 @@ export default function Book() {
   const [day, setDay] = useState(null);
   const [slots, setSlots] = useState(null);
   const [slot, setSlot] = useState(null);
+  // 'slot' = il paziente sceglie un orario libero; 'any' = indica solo una preferenza
+  const [mode, setMode] = useState('slot');
   const [done, setDone] = useState(null);
 
   useEffect(() => {
@@ -61,11 +62,15 @@ export default function Book() {
       <PublicShell info={info}>
         <div className="card success-card">
           <div className="success-icon" aria-hidden>✓</div>
-          <h1>Prenotazione registrata</h1>
+          <h1>Richiesta inviata</h1>
           <p><b>{service.name}</b> con <b>{doctorName(doctor)}</b></p>
-          <p className="big-date">{DateTime.fromISO(slot).toFormat("cccc d LLLL yyyy 'alle' HH:mm")}</p>
-          <p className="muted">Ti abbiamo inviato la conferma via email (e su WhatsApp, se richiesto) con il link per gestire o annullare l'appuntamento.</p>
-          <Link className="btn" to={`/appuntamento/${done}`}>Vedi il tuo appuntamento</Link>
+          <p className="big-date">{done.slot ? DateTime.fromISO(done.slot).toFormat("cccc d LLLL yyyy 'alle' HH:mm") : 'Nessun orario preciso'}</p>
+          {done.preferences && <p className="muted">Preferenza: {done.preferences}</p>}
+          <p>
+            <b>La prenotazione non è ancora confermata.</b> Lo studio controllerà la tua richiesta e ti invierà
+            la conferma via email{done.whatsapp ? ' e WhatsApp' : ''}. Ti abbiamo già mandato un'email di riepilogo.
+          </p>
+          <a className="btn" href={siteHome()}>Torna al sito</a>
         </div>
       </PublicShell>
     );
@@ -75,7 +80,8 @@ export default function Book() {
 
   return (
     <PublicShell info={info}>
-      <h1>Prenota una visita</h1>
+      <h1>Richiedi una prenotazione</h1>
+      <p className="muted" style={{ marginTop: -8, marginBottom: 14 }}>Scegli prestazione e medico: lo studio ti confermerà l'appuntamento via email e WhatsApp.</p>
 
       <section className="step">
         <div className="step-head"><span className="step-n">1</span> Prestazione {service && <button className="link" onClick={() => reset(1)}>cambia</button>}</div>
@@ -124,7 +130,14 @@ export default function Book() {
 
       {doctor && (
         <section className="step">
-          <div className="step-head"><span className="step-n">3</span> Data e ora</div>
+          <div className="step-head"><span className="step-n">3</span> Quando preferisci?</div>
+          <div className="segmented mode-switch" role="group">
+            <button className={mode === 'slot' ? 'on' : ''} onClick={() => setMode('slot')}>Scelgo giorno e orario</button>
+            <button className={mode === 'any' ? 'on' : ''} onClick={() => { setMode('any'); setSlot(null); }}>Nessun orario preciso</button>
+          </div>
+          {mode === 'any' ? (
+            <p className="muted small">Nel passaggio successivo puoi indicare giorni o fasce orarie che preferisci: lo studio ti proporrà un appuntamento.</p>
+          ) : (<>
           <div className="day-strip">
             <button className="btn btn-icon" disabled={from <= today} onClick={() => setFrom(DateTime.max(today, from.minus({ days: STRIP_DAYS })))} aria-label="Giorni precedenti">‹</button>
             <div className="days">
@@ -148,16 +161,20 @@ export default function Book() {
               {slots?.map((s) => <button key={s} className={`chip ${slot === s ? 'chip-on' : ''}`} onClick={() => setSlot(s)}>{fmtTime(s)}</button>)}
             </div>
           )}
+          </>)}
         </section>
       )}
 
-      {slot && <BookingForm service={service} doctor={doctor} slot={slot} onDone={setDone} onConflict={() => { setSlot(null); setFrom(from.plus({ seconds: 1 })); }} />}
+      {doctor && (slot || mode === 'any') && (
+        <BookingForm service={service} doctor={doctor} slot={mode === 'slot' ? slot : null}
+          onDone={setDone} onConflict={() => { setSlot(null); setFrom(from.plus({ seconds: 1 })); }} />
+      )}
     </PublicShell>
   );
 }
 
 function BookingForm({ service, doctor, slot, onDone, onConflict }) {
-  const [f, setF] = useState({ firstName: '', lastName: '', email: '', phone: '', fiscalCode: '', birthDate: '', notes: '', whatsappOptIn: true, privacyConsent: false });
+  const [f, setF] = useState({ firstName: '', lastName: '', email: '', phone: '', fiscalCode: '', birthDate: '', preferences: '', notes: '', whatsappOptIn: true, privacyConsent: false });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
@@ -167,8 +184,9 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
     setBusy(true);
     setErr(null);
     try {
-      const r = await api('/public/book', { method: 'POST', body: { ...f, doctorId: doctor.id, serviceId: service.id, start: slot } });
-      onDone(r.token);
+      const body = { ...f, doctorId: doctor.id, serviceId: service.id, start: slot || undefined, preferences: slot ? undefined : f.preferences };
+      await api('/public/request', { method: 'POST', body });
+      onDone({ slot, preferences: slot ? null : f.preferences, whatsapp: f.whatsappOptIn });
     } catch (e2) {
       setErr(errorMessage(e2));
       if (e2.status === 409) onConflict();
@@ -178,8 +196,11 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
   return (
     <section className="step">
       <div className="step-head"><span className="step-n">4</span> I tuoi dati</div>
-      <div className="step-value">{DateTime.fromISO(slot).toFormat("cccc d LLLL 'alle' HH:mm")}</div>
+      {slot && <div className="step-value">{DateTime.fromISO(slot).toFormat("cccc d LLLL 'alle' HH:mm")}</div>}
       <form className="form" onSubmit={submit}>
+        {!slot && (
+          <label>Giorni o orari preferiti<input value={f.preferences} onChange={set('preferences')} maxLength={300} placeholder="Es. martedì o giovedì pomeriggio, dopo le 17" /></label>
+        )}
         <div className="grid2">
           <label>Nome *<input required autoComplete="given-name" value={f.firstName} onChange={set('firstName')} /></label>
           <label>Cognome *<input required autoComplete="family-name" value={f.lastName} onChange={set('lastName')} /></label>
@@ -192,10 +213,17 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
         <label className="check"><input type="checkbox" checked={f.whatsappOptIn} onChange={set('whatsappOptIn')} /> Voglio ricevere conferma e promemoria anche su WhatsApp</label>
         <label className="check"><input type="checkbox" required checked={f.privacyConsent} onChange={set('privacyConsent')} /> Acconsento al trattamento dei miei dati personali per la gestione della prenotazione *</label>
         {err && <div className="alert">{err}</div>}
-        <button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Invio…' : 'Conferma prenotazione'}</button>
+        <button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Invio…' : 'Invia la richiesta'}</button>
+        <p className="muted small" style={{ textAlign: 'center' }}>La prenotazione sarà valida solo dopo la conferma dello studio.</p>
       </form>
     </section>
   );
+}
+
+/** Pagina principale del sito: sul dominio dell'agenda (app.) rimanda al dominio del sito */
+export function siteHome() {
+  const host = window.location.hostname;
+  return host.startsWith('app.') ? `${window.location.protocol}//${host.slice(4)}/` : '/';
 }
 
 export function PublicShell({ info, children }) {
@@ -203,7 +231,7 @@ export function PublicShell({ info, children }) {
     <div className="public">
       <header className="public-head">
         <div className="public-inner">
-          <div className="brand">{info?.clinic?.name || 'Prenotazioni'}</div>
+          <a className="brand" href={siteHome()} style={{ textDecoration: 'none' }}>{info?.clinic?.name || 'Prenotazioni'}</a>
           {info?.clinic && <div className="muted small">{[info.clinic.address, info.clinic.phone].filter(Boolean).join(' · ')}</div>}
         </div>
       </header>

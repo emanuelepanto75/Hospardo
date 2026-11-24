@@ -106,7 +106,7 @@
       <div>
         <div class="eyebrow" data-clinic-name>Prenotazioni online</div>
         <h1>Prenota la tua visita online, quando vuoi</h1>
-        <p class="lead" data-description>Scegli la prestazione, il medico e l'orario libero che preferisci. Ricevi subito la conferma e un promemoria il giorno prima.</p>
+        <p class="lead" data-description>Scegli la prestazione, il medico e l'orario che preferisci: lo studio ti conferma l'appuntamento via email e WhatsApp.</p>
         <div class="cta">
           <a class="btn light" data-book href="/prenota">Prenota online</a>
           <a class="btn ghost" data-phone-link hidden href="#">Chiama lo studio</a>
@@ -115,9 +115,9 @@
       <div class="steps-card">
         <h2>Come funziona</h2>
         <ol>
-          <li><div><b>Scegli la prestazione e il medico</b><span>Vedi subito i giorni e gli orari liberi.</span></div></li>
-          <li><div><b>Inserisci i tuoi dati</b><span>Nome, telefono ed email: bastano pochi secondi.</span></div></li>
-          <li><div><b>Ricevi conferma e promemoria</b><span>Via email e WhatsApp, con il link per annullare se non puoi venire.</span></div></li>
+          <li><div><b>Scegli la prestazione e il medico</b><span>Indica un orario libero o, se preferisci, solo i giorni che ti vanno bene.</span></div></li>
+          <li><div><b>Invia la richiesta</b><span>Nome, telefono ed email: bastano pochi secondi.</span></div></li>
+          <li><div><b>Lo studio ti conferma</b><span>Ricevi la conferma via email e WhatsApp e, il giorno prima, un promemoria.</span></div></li>
         </ol>
       </div>
     </div>
@@ -166,7 +166,7 @@
 
 <script>
 (function () {
-  // L'agenda è su app.DOMINIO; in anteprima locale su http://localhost:4100
+  // L'area riservata è su app.DOMINIO; in anteprima locale su http://localhost:4100
   var host = location.hostname.replace(/^www\./, '');
   var app = (host === 'localhost' || host === '127.0.0.1') ? 'http://localhost:4100' : 'https://app.' + host;
 
@@ -182,7 +182,7 @@
   function euro(c) { return (c / 100).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }); }
   function get(path) { return fetch(path, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
 
-  all('[data-book]').forEach(function (a) { a.href = app + '/prenota'; });
+  // la richiesta di prenotazione è su questo stesso dominio (/prenota): il tasto indietro riporta al sito
   all('[data-staff]').forEach(function (a) { a.href = app + '/'; });
   all('[data-year]').forEach(function (s) { s.textContent = new Date().getFullYear(); });
 

@@ -2,13 +2,13 @@
  * API pubbliche per la prenotazione online da parte dei pazienti (nessun login).
  */
 const router = require('express').Router();
-const crypto = require('crypto');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const config = require('../lib/config');
 const { ah, HttpError, notFound } = require('../lib/errors');
-const { getFreeSlots, assertFree, lockDoctor } = require('../services/availability');
+const { getFreeSlots } = require('../services/availability');
 const { notifyAppointment } = require('../services/notify');
+const { sendRequestReceived, sendStudioAlert } = require('../services/requestMail');
 const { effective } = require('../services/catalog');
 const { DateTime, TZ } = require('../lib/time');
 const { rateLimit } = require('../lib/rateLimit');
@@ -82,7 +82,7 @@ router.get('/slots', ah(async (req, res) => {
   const { durationMin } = await loadBookable(doctorId, serviceId);
   const { notBefore, lastDay } = bookingWindow();
   if (date > lastDay) return res.json([]);
-  const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore });
+  const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore, holds: true });
   res.json(slots.map((s) => s.start));
 }));
 
@@ -101,98 +101,69 @@ router.get('/days', ah(async (req, res) => {
   for (let i = 0; i < days; i++, d = d.plus({ days: 1 })) {
     const date = d.toISODate();
     if (date > lastDay) break;
-    const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore });
+    const slots = await getFreeSlots({ doctorId, date, durationMin, notBefore, holds: true });
     result.push({ date, available: slots.length });
   }
   res.json(result);
 }));
 
 const emptyToUndef = (s) => (typeof s === 'string' && s.trim() === '' ? undefined : s);
-const bookSchema = z.object({
+const requestSchema = z.object({
   doctorId: z.number().int(),
   serviceId: z.number().int(),
-  start: z.coerce.date(),
-  firstName: z.string().trim().min(1, 'Nome obbligatorio'),
-  lastName: z.string().trim().min(1, 'Cognome obbligatorio'),
+  // orario scelto tra quelli liberi (facoltativo) oppure preferenze libere
+  start: z.preprocess(emptyToUndef, z.coerce.date().optional()),
+  preferences: z.preprocess(emptyToUndef, z.string().trim().max(300).optional()),
+  firstName: z.string().trim().min(1, 'Nome obbligatorio').max(80),
+  lastName: z.string().trim().min(1, 'Cognome obbligatorio').max(80),
   email: z.string().trim().email('Email non valida'),
-  phone: z.string().trim().min(6, 'Telefono obbligatorio'),
+  phone: z.string().trim().min(6, 'Telefono obbligatorio').max(30),
   fiscalCode: z.preprocess(emptyToUndef, z.string().trim().toUpperCase().regex(/^[A-Z0-9]{16}$/, 'Codice fiscale non valido').optional()),
   birthDate: z.preprocess(emptyToUndef, z.coerce.date().optional()),
-  notes: z.string().max(1000).optional(),
+  notes: z.preprocess(emptyToUndef, z.string().trim().max(1000).optional()),
   whatsappOptIn: z.boolean().optional(),
   privacyConsent: z.literal(true, { errorMap: () => ({ message: 'Il consenso privacy è obbligatorio' }) }),
 });
 
-router.post('/book', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
-  const data = bookSchema.parse(req.body);
+/**
+ * Richiesta di prenotazione dal sito: NON crea l'appuntamento.
+ * Lo studio la conferma (o la rifiuta) dalla pagina Richieste dell'agenda.
+ */
+router.post('/request', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
+  const data = requestSchema.parse(req.body);
   const { durationMin } = await loadBookable(data.doctorId, data.serviceId);
-  const { notBefore } = bookingWindow();
-  const end = new Date(data.start.getTime() + durationMin * 60000);
 
-  // lo slot deve essere tra quelli effettivamente proposti
-  const date = DateTime.fromJSDate(data.start).setZone(TZ).toISODate();
-  const slots = await getFreeSlots({ doctorId: data.doctorId, date, durationMin, notBefore });
-  if (!slots.some((s) => +s.start === +data.start)) throw new HttpError(409, 'L\'orario scelto non è più disponibile');
+  let preferredEnd = null;
+  if (data.start) {
+    // l'orario deve essere ancora tra quelli liberi (e non "tenuto" da un'altra richiesta)
+    const { notBefore } = bookingWindow();
+    const date = DateTime.fromJSDate(data.start).setZone(TZ).toISODate();
+    const slots = await getFreeSlots({ doctorId: data.doctorId, date, durationMin, notBefore, holds: true });
+    if (!slots.some((s) => +s.start === +data.start)) throw new HttpError(409, 'L\'orario scelto non è più disponibile: scegline un altro');
+    preferredEnd = new Date(data.start.getTime() + durationMin * 60000);
+  }
 
-  const appt = await prisma.$transaction(async (tx) => {
-    await lockDoctor(tx, data.doctorId);
-    await assertFree(tx, { doctorId: data.doctorId, start: data.start, end });
-
-    // Abbina un paziente esistente: per codice fiscale, altrimenti nome+cognome+email
-    let patient = null;
-    if (data.fiscalCode) patient = await tx.patient.findUnique({ where: { fiscalCode: data.fiscalCode } });
-    if (!patient) {
-      patient = await tx.patient.findFirst({
-        where: {
-          firstName: { equals: data.firstName, mode: 'insensitive' },
-          lastName: { equals: data.lastName, mode: 'insensitive' },
-          email: { equals: data.email, mode: 'insensitive' },
-        },
-      });
-    }
-    if (!patient) {
-      patient = await tx.patient.create({
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          fiscalCode: data.fiscalCode ?? null,
-          birthDate: data.birthDate ?? null,
-          privacyConsent: true,
-          whatsappOptIn: data.whatsappOptIn ?? true,
-        },
-      });
-    } else {
-      // aggiorna solo i recapiti mancanti, senza sovrascrivere i dati in anagrafica
-      await tx.patient.update({
-        where: { id: patient.id },
-        data: {
-          phone: patient.phone || data.phone,
-          email: patient.email || data.email,
-          privacyConsent: true,
-          ...(data.whatsappOptIn !== undefined ? { whatsappOptIn: data.whatsappOptIn } : {}),
-        },
-      });
-    }
-
-    return tx.appointment.create({
-      data: {
-        doctorId: data.doctorId,
-        patientId: patient.id,
-        serviceId: data.serviceId,
-        start: data.start,
-        end,
-        notes: data.notes ? `[Nota del paziente] ${data.notes}` : null,
-        source: 'ONLINE',
-        manageToken: crypto.randomBytes(24).toString('base64url'),
-      },
-      include: { patient: true, doctor: true, service: true },
-    });
+  const request = await prisma.bookingRequest.create({
+    data: {
+      doctorId: data.doctorId,
+      serviceId: data.serviceId,
+      preferredStart: data.start ?? null,
+      preferredEnd,
+      preferences: data.preferences ?? null,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      fiscalCode: data.fiscalCode ?? null,
+      birthDate: data.birthDate ?? null,
+      notes: data.notes ?? null,
+      whatsappOptIn: data.whatsappOptIn ?? true,
+    },
+    include: { doctor: true, service: true },
   });
 
-  await notifyAppointment(appt, 'CONFERMA');
-  res.status(201).json({ token: appt.manageToken });
+  await Promise.all([sendRequestReceived(request), sendStudioAlert(request)]);
+  res.status(201).json({ ok: true });
 }));
 
 // ---- Gestione appuntamento tramite link ricevuto via email ----

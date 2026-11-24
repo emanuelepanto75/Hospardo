@@ -25,6 +25,12 @@ enum AppointmentStatus {
   NON_PRESENTATO
 }
 
+enum RequestStatus {
+  NUOVA      // in attesa che lo studio la gestisca
+  CONFERMATA // trasformata in appuntamento
+  RIFIUTATA
+}
+
 enum AppointmentSource {
   INTERNO
   ONLINE
@@ -87,6 +93,7 @@ model Doctor {
   workingHours  WorkingHours[]
   timeOff       TimeOff[]
   appointments  Appointment[]
+  requests      BookingRequest[]
 
   @@map("doctors")
 }
@@ -106,6 +113,7 @@ model Service {
 
   doctors        DoctorService[]
   appointments   Appointment[]
+  requests       BookingRequest[]
 
   @@map("services")
 }
@@ -194,6 +202,7 @@ model Appointment {
   reminderSentAt     DateTime?         @map("reminder_sent_at")
   createdById        Int?              @map("created_by_id")
   notifications      Notification[]
+  request            BookingRequest?
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -218,4 +227,37 @@ model Notification {
 
   @@index([appointmentId])
   @@map("notifications")
+}
+
+/// Richiesta di prenotazione inviata dal sito: diventa un appuntamento solo quando lo studio la conferma
+model BookingRequest {
+  id             Int           @id @default(autoincrement())
+  status         RequestStatus @default(NUOVA)
+  doctorId       Int           @map("doctor_id")
+  doctor         Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  serviceId      Int           @map("service_id")
+  service        Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// orario scelto dal paziente (facoltativo): resta "tenuto" finché la richiesta è NUOVA
+  preferredStart DateTime?     @map("preferred_start")
+  preferredEnd   DateTime?     @map("preferred_end")
+  /// preferenze libere, es. "martedì mattina"
+  preferences    String?
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  email          String
+  phone          String
+  fiscalCode     String?       @map("fiscal_code")
+  birthDate      DateTime?     @map("birth_date") @db.Date
+  notes          String?
+  whatsappOptIn  Boolean       @default(true) @map("whatsapp_opt_in")
+  appointmentId  Int?          @unique @map("appointment_id")
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  handledById    Int?          @map("handled_by_id")
+  handledAt      DateTime?     @map("handled_at")
+  rejectReason   String?       @map("reject_reason")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@index([doctorId, preferredStart])
+  @@map("booking_requests")
 }

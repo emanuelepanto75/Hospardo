@@ -27,7 +27,7 @@ function details(appt) {
     service: appt.service ? appt.service.name : 'Visita',
     doctor: [appt.doctor.title, appt.doctor.firstName, appt.doctor.lastName].filter(Boolean).join(' '),
     when: formatLocal(appt.start),
-    manageUrl: `${config.frontendUrl}/appuntamento/${appt.manageToken}`,
+    manageUrl: `${config.publicUrl}/appuntamento/${appt.manageToken}`,
   };
 }
 

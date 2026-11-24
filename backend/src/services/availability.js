@@ -7,7 +7,7 @@ const ACTIVE_STATUSES = ['PRENOTATO', 'CONFERMATO', 'IN_ATTESA', 'COMPLETATO'];
  * Calcola gli slot liberi di un medico in una data (locale) per una durata.
  * @returns {Promise<{start: Date, end: Date}[]>}
  */
-async function getFreeSlots({ doctorId, date, durationMin, notBefore }) {
+async function getFreeSlots({ doctorId, date, durationMin, notBefore, holds = false, excludeRequestId }) {
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId },
     include: { workingHours: { where: { weekday: isoWeekday(date) } } },
@@ -26,6 +26,17 @@ async function getFreeSlots({ doctorId, date, durationMin, notBefore }) {
     }),
   ]);
   const busy = [...appointments, ...timeOff];
+  // per i pazienti: gli orari scelti in richieste ancora da gestire restano "tenuti"
+  if (holds) {
+    const held = await prisma.bookingRequest.findMany({
+      where: {
+        doctorId, status: 'NUOVA', preferredStart: { lt: dayEnd }, preferredEnd: { gt: dayStart },
+        ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
+      },
+      select: { preferredStart: true, preferredEnd: true },
+    });
+    busy.push(...held.map((h) => ({ start: h.preferredStart, end: h.preferredEnd })));
+  }
 
   const step = doctor.slotStepMin || 15;
   const blocks = [...doctor.workingHours].sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));

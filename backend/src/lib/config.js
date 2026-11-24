@@ -4,6 +4,8 @@ const config = {
   port: Number(process.env.PORT || 4000),
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-non-usare-in-produzione',
   frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, ''),
+  /// indirizzo pubblico per i pazienti (pagina web, prenotazione, link nelle email); default = FRONTEND_URL
+  publicUrl: (process.env.PUBLIC_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, ''),
   timezone: process.env.TIMEZONE || 'Europe/Rome',
   clinic: {
     name: process.env.CLINIC_NAME || 'Studio Medico',
@@ -30,6 +32,10 @@ const config = {
   reminderMode: process.env.REMINDER_MODE === 'hours' ? 'hours' : 'day_before',
   reminderTime: process.env.REMINDER_TIME || '10:00',
   reminderHoursBefore: Number(process.env.REMINDER_HOURS_BEFORE || 24),
+  /// Richieste di prenotazione dal sito: a chi arriva l'avviso di nuova richiesta
+  requests: {
+    notifyEmail: (process.env.REQUESTS_EMAIL || process.env.REPORT_EMAIL || process.env.CLINIC_EMAIL || '').trim(),
+  },
   /// Riepilogo serale via email (Excel + calendario) dei prossimi giorni lavorativi
   report: {
     email: (process.env.REPORT_EMAIL || '').trim(),

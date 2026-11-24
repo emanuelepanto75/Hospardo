@@ -3,7 +3,8 @@
 #
 #   https://DOMINIO        pagina web pubblica (cartella site)
 #   https://www.DOMINIO    rimanda a https://DOMINIO
-#   https://app.DOMINIO    agenda: area riservata e prenotazione pazienti (/prenota)
+#   https://DOMINIO/prenota  richiesta di prenotazione dei pazienti (servita dall'agenda)
+#   https://app.DOMINIO    agenda: area riservata del personale
 #   http://localhost:4180  anteprima della pagina web da questo PC
 #
 # DOMINIO si imposta con HOSPARDO_DOMAIN nel file .env della cartella principale.
@@ -28,12 +29,10 @@
 
 (sito) {
 	import sicurezza
-	# dati pubblici dell'agenda mostrati nella pagina (contatti, prestazioni, medici): solo lettura
-	@dati_pubblici {
-		method GET
-		path /api/public/info /api/public/services /api/public/doctors
-	}
-	handle @dati_pubblici {
+	# pagine e dati pubblici dell'agenda sul dominio del sito: prenotazione, gestione appuntamento
+	# dal link nelle email, dati della pagina (contatti, prestazioni, medici). Nessuna pagina riservata.
+	@agenda_pubblica path /prenota /prenota/* /appuntamento/* /assets/* /api/public/*
+	handle @agenda_pubblica {
 		reverse_proxy app:4100
 	}
 	handle {
@@ -45,6 +44,9 @@
 
 http://app.{$HOSPARDO_DOMAIN} {
 	import sicurezza
+	# le pagine per i pazienti stanno sul dominio del sito
+	@pazienti path /prenota /prenota/* /appuntamento/*
+	redir @pazienti https://{$HOSPARDO_DOMAIN}{uri}
 	reverse_proxy app:4100
 }
 

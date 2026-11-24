@@ -1,11 +1,27 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
+import { siteHome } from '../pages/Book';
 import { ROLES, isAdmin } from '../lib/constants';
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const canHandleRequests = isAdmin(user) || user.role === 'SEGRETERIA';
+  // numero di richieste di prenotazione in attesa, aggiornato ogni minuto
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    if (!canHandleRequests) return undefined;
+    const load = () => api('/requests/count').then((r) => setPending(r.count)).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    window.addEventListener('hospardo:requests', load);
+    return () => { clearInterval(t); window.removeEventListener('hospardo:requests', load); };
+  }, [canHandleRequests]);
+
   const links = [
     { to: '/agenda', label: 'Agenda', icon: '📅' },
+    ...(canHandleRequests ? [{ to: '/richieste', label: 'Richieste', icon: '📥', badge: pending }] : []),
     { to: '/promemoria', label: 'Promemoria', icon: '💬' },
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
@@ -20,9 +36,10 @@ export default function Layout() {
           {links.map((l) => (
             <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? 'active' : '')}>
               <span aria-hidden>{l.icon}</span> {l.label}
+              {l.badge > 0 && <span className="nav-badge">{l.badge}</span>}
             </NavLink>
           ))}
-          <a href="/prenota" target="_blank" rel="noreferrer"><span aria-hidden>🌐</span> Pagina prenotazioni</a>
+          <a href={`${siteHome()}prenota`} target="_blank" rel="noreferrer"><span aria-hidden>🌐</span> Pagina prenotazioni</a>
         </nav>
         <div className="sidebar-user">
           <div><b>{user.name}</b></div>

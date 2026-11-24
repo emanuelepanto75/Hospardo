@@ -6,8 +6,8 @@ Stessa impostazione di CivicAlerts, con un **tunnel dedicato** a Hospardo:
 |---|---|
 | `https://DOMINIO` | la pagina web pubblica (cartella `site`) |
 | `https://www.DOMINIO` | rimanda a `https://DOMINIO` |
+| `https://DOMINIO/prenota` | la richiesta di prenotazione per i pazienti (confermata poi dallo studio) |
 | `https://app.DOMINIO` | l'agenda: area riservata per segreteria e medici |
-| `https://app.DOMINIO/prenota` | la prenotazione online per i pazienti |
 
 Nei comandi e negli esempi sostituisci `DOMINIO` con il vostro dominio (es. `hospardo.it`).
 Il dominio deve essere già **attivo** nel tuo account Cloudflare (name server Cloudflare).
@@ -55,6 +55,8 @@ notepad backend\.env
 
 ```
 FRONTEND_URL="https://app.DOMINIO"
+PUBLIC_URL="https://DOMINIO"
+REQUESTS_EMAIL="segreteria@..."     (riceve l'avviso di nuova richiesta)
 CLINIC_NAME="Nome dello studio"
 CLINIC_ADDRESS="Via ..., Città"
 CLINIC_PHONE="..."
@@ -102,10 +104,11 @@ Dal telefono **con il Wi-Fi spento**:
 
 - `https://DOMINIO` → pagina web con prestazioni, medici e contatti;
 - `https://www.DOMINIO` → porta alla stessa pagina;
-- `https://app.DOMINIO` → accesso all'agenda;
-- `https://app.DOMINIO/prenota` → prenotazione dei pazienti.
+- `https://DOMINIO/prenota` → richiesta di prenotazione dei pazienti;
+- `https://app.DOMINIO` → accesso all'agenda.
 
-Fai una prenotazione di prova e controlla che il link nell'email porti a `https://app.DOMINIO/appuntamento/...`.
+Fai una richiesta di prova, confermala dalla pagina **Richieste** dell'agenda e controlla che il link
+nell'email porti a `https://DOMINIO/appuntamento/...`.
 
 ## 5. Protezione in più per l'area riservata (consigliata)
 
@@ -115,8 +118,8 @@ ricevuto via email, oltre alla password di Hospardo. I pazienti continuano a pre
 1. Zero Trust › **Access › Applications** › **Add an application** › **Self-hosted**.
 2. Nome `Hospardo agenda`, dominio `app.DOMINIO`.
 3. Regola **Allow** con le email del personale (o `Emails ending in` per il dominio dello studio).
-4. Aggiungi una seconda applicazione con regola **Bypass** (Everyone) per i percorsi pubblici di `app.DOMINIO`:
-   `/prenota`, `/appuntamento/*`, `/api/public/*`, `/assets/*`, `/icon.svg`.
+4. Non servono eccezioni: le pagine dei pazienti (prenotazione e gestione dell'appuntamento) stanno su
+   `https://DOMINIO`, che resta libero.
 
 ## Comandi utili
 

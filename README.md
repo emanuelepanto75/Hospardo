@@ -22,7 +22,10 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**
-- `/prenota`: scelta prestazione → medico → giorno → orario → dati e consenso privacy
+- `/prenota`: **richiesta** di prenotazione: prestazione → medico → orario libero oppure preferenza libera → dati
+  e consenso privacy. Il paziente riceve un'email di ricevuta, lo studio un avviso; l'orario scelto resta "tenuto".
+  La segreteria la conferma (anche cambiando giorno, ora o medico) o la rifiuta dalla pagina **Richieste**:
+  alla conferma partono l'email e il pulsante WhatsApp
 - `/appuntamento/<codice>`: riepilogo e annullamento dal link ricevuto via email
 
 **Messaggi ai pazienti**: email automatiche (conferma, promemoria il giorno prima, spostamento, annullamento)

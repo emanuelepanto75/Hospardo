@@ -12,6 +12,7 @@ import Services from './pages/Services';
 import Users from './pages/Users';
 import Reminders from './pages/Reminders';
 import PrintWeek from './pages/PrintWeek';
+import Requests from './pages/Requests';
 import Book from './pages/Book';
 import ManageAppointment from './pages/ManageAppointment';
 
@@ -26,6 +27,7 @@ function Private() {
       <Route element={<Layout />}>
         <Route path="/agenda" element={<Agenda />} />
         <Route path="/promemoria" element={<Reminders />} />
+        {(isAdmin(user) || user.role === 'SEGRETERIA') && <Route path="/richieste" element={<Requests />} />}
         <Route path="/pazienti" element={<Patients />} />
         <Route path="/pazienti/:id" element={<PatientDetail />} />
         <Route path="/medici" element={<Doctors />} />
