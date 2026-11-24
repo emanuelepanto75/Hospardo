@@ -58,6 +58,7 @@ app.use(errorHandler);
 if (require.main === module) {
   app.listen(config.port, () => {
     console.log(`Hospardo in ascolto su http://localhost:${config.port}`);
+    console.log(require('./services/mailer').describeConfig());
     if (config.isPublic) console.log(`Indirizzo pubblico configurato: ${config.frontendUrl}`);
     if (process.env.DISABLE_REMINDERS !== 'true') {
       startReminderScheduler();

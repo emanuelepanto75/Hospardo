@@ -19,7 +19,9 @@ const config = {
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE) === 'true',
+    // se non indicato: connessione cifrata diretta sulla porta 465 (es. Aruba smtps.aruba.it), STARTTLS sulle altre
+    // la porta 465 richiede sempre la connessione cifrata diretta (es. Aruba smtps.aruba.it); sulle altre STARTTLS
+    secure: Number(process.env.SMTP_PORT || 587) === 465 || String(process.env.SMTP_SECURE).trim() === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
     from: process.env.MAIL_FROM || 'Studio Medico <noreply@example.com>',
