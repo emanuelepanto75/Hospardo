@@ -8,13 +8,14 @@ const { buildDoctorWeek, buildDoctorWeekPdf } = require('../services/doctorWeek'
 const querySchema = z.object({
   doctorId: z.coerce.number().int(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  period: z.enum(['day', 'week']).default('week'),
 });
 
 async function load(req) {
-  const { doctorId, date } = querySchema.parse(req.query);
+  const { doctorId, date, period } = querySchema.parse(req.query);
   // il medico può stampare solo la propria agenda
   if (req.user.role === 'MEDICO' && req.user.doctorId !== doctorId) throw new HttpError(403, 'Puoi stampare solo la tua agenda');
-  const week = await buildDoctorWeek(doctorId, date || DateTime.now().setZone(TZ).toISODate());
+  const week = await buildDoctorWeek(doctorId, date || DateTime.now().setZone(TZ).toISODate(), period);
   if (!week) throw notFound('Medico');
   return week;
 }
@@ -26,7 +27,7 @@ router.get('/doctor-week.pdf', ah(async (req, res) => {
   const pdf = await buildDoctorWeekPdf(week);
   const slug = week.doctor.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="agenda-${slug}-${week.from}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="agenda-${week.period === 'day' ? 'giorno' : 'settimana'}-${slug}-${week.from}.pdf"`);
   res.send(pdf);
 }));
 

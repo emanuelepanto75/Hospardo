@@ -48,7 +48,8 @@ export default function Agenda() {
   const { user } = useAuth();
   const [view, setView] = useState(() => readPref('agenda.view', 'day'));
   const [date, setDate] = useState(() => DateTime.now().startOf('day'));
-  const [selected, setSelected] = useState(() => readPref('agenda.doctors', null));
+  // medici aggiunti a mano alla vista giorno (oltre a quelli con appuntamenti)
+  const [extraIds, setExtraIds] = useState([]);
   const [weekDoctor, setWeekDoctor] = useState(() => readPref('agenda.weekDoctor', user.doctorId ?? null));
   const [showCancelled, setShowCancelled] = useState(false);
   const [modal, setModal] = useState(null);
@@ -60,7 +61,7 @@ export default function Agenda() {
   const { data: services } = useApi('/services');
 
   useEffect(() => { writePref('agenda.view', view); }, [view]);
-  useEffect(() => { if (selected) writePref('agenda.doctors', selected); }, [selected]);
+  useEffect(() => { setExtraIds([]); }, [date.toISODate()]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (weekDoctor) writePref('agenda.weekDoctor', weekDoctor); }, [weekDoctor]);
   useEffect(() => { const t = setInterval(() => setNow(DateTime.now()), 60000); return () => clearInterval(t); }, []);
 
@@ -69,15 +70,24 @@ export default function Agenda() {
     () => (doctors || []).filter((d) => d.active && (user.role !== 'MEDICO' || d.id === user.doctorId)),
     [doctors, user.role, user.doctorId],
   );
-  const dayDoctors = useMemo(() => {
-    const ids = selected ?? (user.doctorId ? [user.doctorId] : activeDoctors.map((d) => d.id));
-    const list = activeDoctors.filter((d) => ids.includes(d.id));
-    return list.length ? list : activeDoctors;
-  }, [selected, activeDoctors, user.doctorId]);
-  const weekDoc = activeDoctors.find((d) => d.id === weekDoctor) || activeDoctors[0];
 
   const rangeStart = view === 'day' ? date : date.startOf('week');
   const rangeEnd = view === 'day' ? date.plus({ days: 1 }) : rangeStart.plus({ days: 7 });
+
+  // medici con appuntamenti nel periodo visualizzato
+  const { data: busy, reload: reloadBusy } = useApi('/appointments/busy-doctors', { from: rangeStart.toUTC().toISO(), to: rangeEnd.toUTC().toISO() });
+  const busyCount = useMemo(() => Object.fromEntries((busy || []).map((b) => [b.doctorId, b.count])), [busy]);
+
+  // vista giorno: solo i medici con appuntamenti (più quelli aggiunti a mano); il medico vede sempre la propria colonna
+  const dayDoctors = useMemo(() => {
+    if (user.role === 'MEDICO') return activeDoctors;
+    return activeDoctors.filter((d) => busyCount[d.id] || extraIds.includes(d.id));
+  }, [activeDoctors, busyCount, extraIds, user.role]);
+  const otherDoctors = activeDoctors.filter((d) => !dayDoctors.includes(d));
+
+  // vista settimana: un medico alla volta, proposti per primi quelli con appuntamenti
+  const weekDoc = activeDoctors.find((d) => d.id === weekDoctor)
+    || activeDoctors.find((d) => busyCount[d.id]) || activeDoctors[0];
 
   const query = useMemo(() => ({
     from: rangeStart.toUTC().toISO(),
@@ -159,11 +169,8 @@ export default function Agenda() {
   }
 
   const move = (dir) => setDate(date.plus(view === 'day' ? { days: dir } : { weeks: dir }));
-  const toggleDoctor = (id) => {
-    const cur = dayDoctors.map((d) => d.id);
-    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-    setSelected(next.length ? next : cur);
-  };
+  const byName = (a, b) => a.lastName.localeCompare(b.lastName) || (a.firstName || '').localeCompare(b.firstName || '');
+  const printDoctor = view === 'week' ? weekDoc : dayDoctors.length === 1 ? dayDoctors[0] : null;
 
   if (!doctors || !services) return <div className="page"><p className="muted">Caricamento…</p></div>;
   if (activeDoctors.length === 0) {
@@ -200,9 +207,9 @@ export default function Agenda() {
               {exporting ? 'Preparazione…' : 'Excel 6 giorni'}
             </button>
           )}
-          <Link className="btn" title="Stampa o PDF della settimana di un medico"
-            to={`/stampa/settimana?${new URLSearchParams({ ...((view === 'week' ? weekDoc : dayDoctors.length === 1 ? dayDoctors[0] : null) ? { doctorId: String((view === 'week' ? weekDoc : dayDoctors[0]).id) } : {}), date: date.toISODate() })}`}>
-            Stampa settimana
+          <Link className="btn" title="Stampa o PDF dell'agenda di un medico (giorno o settimana)"
+            to={`/stampa?${new URLSearchParams({ ...(printDoctor ? { doctorId: String(printDoctor.id) } : {}), date: date.toISODate(), period: view })}`}>
+            Stampa
           </Link>
           <button className="btn btn-primary" onClick={() => setModal({ draft: { doctorId: view === 'week' ? weekDoc?.id : dayDoctors[0]?.id, start: date.set({ hour: 9 }).toISO() } })}>+ Appuntamento</button>
         </div>
@@ -210,20 +217,48 @@ export default function Agenda() {
 
       {waNotice && <WaNotice {...waNotice} onClose={() => setWaNotice(null)} />}
 
-      <div className="doctor-filter">
-        {view === 'day'
-          ? activeDoctors.map((d) => (
-            <button key={d.id} className={`chip ${dayDoctors.some((x) => x.id === d.id) ? 'chip-on' : ''}`} style={{ '--c': d.color }} onClick={() => toggleDoctor(d.id)}>
-              <span className="dot" /> {doctorName(d)}
-            </button>
-          ))
-          : activeDoctors.map((d) => (
-            <button key={d.id} className={`chip ${weekDoc?.id === d.id ? 'chip-on' : ''}`} style={{ '--c': d.color }} onClick={() => setWeekDoctor(d.id)}>
-              <span className="dot" /> {doctorName(d)}
-            </button>
-          ))}
-      </div>
+      {user.role !== 'MEDICO' && (
+        <div className="doctor-filter">
+          {view === 'day' ? (
+            <>
+              {dayDoctors.map((d) => (
+                <span key={d.id} className="chip chip-on" style={{ '--c': d.color }}>
+                  <span className="dot" /> {doctorName(d)}
+                  {busyCount[d.id] ? <span className="muted small">{busyCount[d.id]}</span> : (
+                    <button className="chip-x" aria-label={`Nascondi ${doctorName(d)}`} onClick={() => setExtraIds(extraIds.filter((x) => x !== d.id))}>×</button>
+                  )}
+                </span>
+              ))}
+              {otherDoctors.length > 0 && (
+                <select className="doctor-add" value="" onChange={(e) => e.target.value && setExtraIds([...extraIds, Number(e.target.value)])}>
+                  <option value="">+ Mostra un altro medico…</option>
+                  {otherDoctors.slice().sort(byName).map((d) => <option key={d.id} value={d.id}>{d.lastName} {d.firstName}{d.specialty ? ` – ${d.specialty}` : ''}</option>)}
+                </select>
+              )}
+            </>
+          ) : (
+            <select className="doctor-add" value={weekDoc?.id || ''} onChange={(e) => setWeekDoctor(Number(e.target.value))} aria-label="Medico">
+              {activeDoctors.some((d) => busyCount[d.id]) && (
+                <optgroup label="Con appuntamenti in questa settimana">
+                  {activeDoctors.filter((d) => busyCount[d.id]).sort(byName).map((d) => (
+                    <option key={d.id} value={d.id}>{d.lastName} {d.firstName} ({busyCount[d.id]})</option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Senza appuntamenti">
+                {activeDoctors.filter((d) => !busyCount[d.id]).sort(byName).map((d) => <option key={d.id} value={d.id}>{d.lastName} {d.firstName}</option>)}
+              </optgroup>
+            </select>
+          )}
+        </div>
+      )}
 
+      {columns.length === 0 ? (
+        <div className="empty">
+          Nessun appuntamento {view === 'day' ? `per ${date.toFormat('cccc d LLLL')}` : 'in questa settimana'}.
+          {' '}Per inserirne uno usa <b>+ Appuntamento</b>{view === 'day' && otherDoctors.length > 0 && <>, oppure apri l'agenda di un medico da <b>Mostra un altro medico</b></>}.
+        </div>
+      ) : (
       <div className="calendar" style={{ '--cols': columns.length }}>
         <div className="cal-head">
           <div className="cal-gutter" />
@@ -282,6 +317,8 @@ export default function Agenda() {
         </div>
       </div>
 
+      )}
+
       <div className="legend">
         {Object.values(STATUS).map((s) => <span key={s.label}><span className="dot" style={{ background: s.color }} /> {s.label}</span>)}
         <span><span className="swatch-off" /> Assenza</span>
@@ -297,6 +334,7 @@ export default function Agenda() {
           onSaved={(saved, waKind) => {
             setModal(null);
             reload();
+            reloadBusy();
             setWaNotice(waKind ? { appt: saved, kind: waKind } : null);
           }}
         />

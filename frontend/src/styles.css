@@ -282,3 +282,9 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
   .print-table tr { break-inside: avoid; }
   .print-table th, .print-free td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---- Agenda: medici visualizzati ---- */
+.doctor-filter { align-items: center; }
+.doctor-filter .chip { cursor: default; }
+.chip-x { border: 0; background: none; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--muted); padding: 0 2px; }
+.doctor-add { width: auto; min-width: 240px; padding: 5px 10px; border-radius: 99px; font-size: .88rem; }

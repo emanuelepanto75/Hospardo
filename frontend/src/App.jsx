@@ -21,6 +21,7 @@ function Private() {
   if (!user) return <Login />;
   return (
     <Routes>
+      <Route path="/stampa" element={<PrintWeek />} />
       <Route path="/stampa/settimana" element={<PrintWeek />} />
       <Route element={<Layout />}>
         <Route path="/agenda" element={<Agenda />} />

@@ -71,6 +71,20 @@ router.get('/', ah(async (req, res) => {
   res.json(items);
 }));
 
+/** Medici con appuntamenti (non annullati) nell'intervallo, con il loro numero: per l'agenda */
+router.get('/busy-doctors', ah(async (req, res) => {
+  const { from, to } = z.object({ from: z.coerce.date(), to: z.coerce.date() }).parse(req.query);
+  const rows = await prisma.appointment.groupBy({
+    by: ['doctorId'],
+    where: {
+      start: { lt: to }, end: { gt: from }, status: { not: 'ANNULLATO' },
+      ...(req.user.role === 'MEDICO' ? { doctorId: req.user.doctorId ?? -1 } : {}),
+    },
+    _count: { _all: true },
+  });
+  res.json(rows.map((r) => ({ doctorId: r.doctorId, count: r._count._all })));
+}));
+
 router.get('/availability', ah(async (req, res) => {
   const { doctorId, date, serviceId, durationMin } = z.object({
     doctorId: z.coerce.number().int(),

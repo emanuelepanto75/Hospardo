@@ -23,16 +23,21 @@ const euro = (cents) => (cents == null ? '' : (cents / 100).toLocaleString('it-I
  * @param {number} doctorId
  * @param {string} date  un giorno qualsiasi della settimana (YYYY-MM-DD, ora dello studio)
  */
-async function buildDoctorWeek(doctorId, date) {
+/**
+ * @param {'day'|'week'} period  'day' = solo il giorno indicato; 'week' = lunedì–sabato (domenica se lavorata)
+ */
+async function buildDoctorWeek(doctorId, date, period = 'week') {
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId },
     include: { workingHours: true, services: { include: { service: true } } },
   });
   if (!doctor) return null;
 
-  const monday = DateTime.fromISO(date, { zone: TZ }).startOf('week');
+  const isDay = period === 'day';
+  const monday = isDay ? DateTime.fromISO(date, { zone: TZ }).startOf('day') : DateTime.fromISO(date, { zone: TZ }).startOf('week');
+  const nDays = isDay ? 1 : 7;
   const from = monday.toJSDate();
-  const to = monday.plus({ days: 7 }).toJSDate();
+  const to = monday.plus({ days: nDays }).toJSDate();
   const [appointments, timeOff] = await Promise.all([
     prisma.appointment.findMany({
       where: { doctorId, start: { gte: from, lt: to }, status: { not: 'ANNULLATO' } },
@@ -47,7 +52,7 @@ async function buildDoctorWeek(doctorId, date) {
   const servicePrice = (a) => (a.serviceId ? (priceOf.has(a.serviceId) ? priceOf.get(a.serviceId) : a.service?.priceCents ?? null) : null);
 
   const days = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < nDays; i++) {
     const d = monday.plus({ days: i });
     const iso = d.toISODate();
     const { start, end } = dayBounds(iso);
@@ -55,7 +60,7 @@ async function buildDoctorWeek(doctorId, date) {
       .filter((h) => h.weekday === d.weekday)
       .sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
     const dayAppts = appointments.filter((a) => a.start >= start && a.start < end);
-    if (d.weekday === 7 && !blocks.length && !dayAppts.length) continue; // domenica solo se serve
+    if (!isDay && d.weekday === 7 && !blocks.length && !dayAppts.length) continue; // domenica solo se serve
 
     const absences = timeOff.filter((t) => t.start < end && t.end > start);
     const busy = [...dayAppts.map((a) => [a.start, a.end]), ...absences.map((t) => [t.start, t.end])];
@@ -92,13 +97,18 @@ async function buildDoctorWeek(doctorId, date) {
     });
   }
 
-  const last = monday.plus({ days: days.some((d) => DateTime.fromISO(d.date).weekday === 7) ? 6 : 5 });
+  const last = isDay ? monday : monday.plus({ days: days.some((d) => DateTime.fromISO(d.date).weekday === 7) ? 6 : 5 });
   return {
+    period: isDay ? 'day' : 'week',
+    title: isDay ? 'Agenda del giorno' : 'Agenda settimanale',
+    totalLabel: isDay ? 'Totale giornata' : 'Totale settimana',
     clinic: config.clinic,
     doctor: { id: doctor.id, name: docName(doctor), specialty: doctor.specialty || '' },
     from: monday.toISODate(),
     to: last.toISODate(),
-    periodLabel: `${monday.setLocale('it').toFormat('d LLLL')} – ${last.setLocale('it').toFormat('d LLLL yyyy')}`,
+    periodLabel: isDay
+      ? cap(monday.setLocale('it').toFormat('cccc d LLLL yyyy'))
+      : `${monday.setLocale('it').toFormat('d LLLL')} – ${last.setLocale('it').toFormat('d LLLL yyyy')}`,
     printedAt: DateTime.now().setZone(TZ).setLocale('it').toFormat("d/LL/yyyy 'alle' HH:mm"),
     days,
     totals: {
@@ -161,7 +171,7 @@ function buildDoctorWeekPdf(week) {
 
     // titolo
     header();
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(16).text(`Agenda settimanale – ${week.doctor.name}`, left, doc.y);
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(16).text(`${week.title} – ${week.doctor.name}`, left, doc.y);
     doc.fillColor(MUTED).font('Helvetica').fontSize(10)
       .text([week.doctor.specialty, week.periodLabel, `${week.totals.count} appuntamenti`, `totale previsto ${euro(week.totals.amountCents)}`].filter(Boolean).join('  ·  '));
     doc.moveDown(0.6);
@@ -224,7 +234,7 @@ function buildDoctorWeekPdf(week) {
     doc.moveTo(left, doc.y).lineTo(left + width, doc.y).strokeColor(NAVY).lineWidth(0.8).stroke();
     doc.moveDown(0.3);
     doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10)
-      .text(`Totale settimana: ${week.totals.count} appuntamenti · ${euro(week.totals.amountCents)}`, left, doc.y, { width, align: 'right' });
+      .text(`${week.totalLabel}: ${week.totals.count} appuntamenti · ${euro(week.totals.amountCents)}`, left, doc.y, { width, align: 'right' });
     doc.fillColor(MUTED).font('Helvetica').fontSize(7.5)
       .text('Tariffe secondo il listino attuale; esclusi annullati e mancate presentazioni.', left, doc.y + 2, { width, align: 'right' });
 

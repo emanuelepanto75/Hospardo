@@ -19,6 +19,7 @@ export default function PrintWeek() {
   const isDoctor = user.role === 'MEDICO';
   const doctorId = isDoctor ? user.doctorId : Number(params.get('doctorId')) || null;
   const date = params.get('date') || DateTime.now().toISODate();
+  const period = params.get('period') === 'day' ? 'day' : 'week';
 
   useEffect(() => {
     if (!isDoctor) api('/doctors').then((list) => setDoctors(list.filter((d) => d.active && !d.archivedAt))).catch(() => setDoctors([]));
@@ -27,15 +28,20 @@ export default function PrintWeek() {
   useEffect(() => {
     if (!doctorId) { setWeek(null); return; }
     setErr(null);
-    api('/prints/doctor-week', { query: { doctorId, date } }).then(setWeek).catch((e) => { setWeek(null); setErr(errorMessage(e)); });
-  }, [doctorId, date]);
+    api('/prints/doctor-week', { query: { doctorId, date, period } }).then(setWeek).catch((e) => { setWeek(null); setErr(errorMessage(e)); });
+  }, [doctorId, date, period]);
 
-  const set = (patch) => setParams({ ...(doctorId && !isDoctor ? { doctorId } : {}), date, ...patch });
-  const shift = (weeks) => set({ date: DateTime.fromISO(date).plus({ weeks }).toISODate() });
+  const set = (patch) => setParams({ ...(doctorId && !isDoctor ? { doctorId } : {}), date, period, ...patch });
+  // nel giorno salta la domenica
+  const shift = (n) => {
+    let d = DateTime.fromISO(date).plus(period === 'day' ? { days: n } : { weeks: n });
+    if (period === 'day' && d.weekday === 7) d = d.plus({ days: n });
+    set({ date: d.toISODate() });
+  };
 
   async function pdf() {
     setBusy(true);
-    try { await download(`/prints/doctor-week.pdf?doctorId=${doctorId}&date=${date}`, 'agenda.pdf'); } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
+    try { await download(`/prints/doctor-week.pdf?doctorId=${doctorId}&date=${date}&period=${period}`, 'agenda.pdf'); } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
 
   const options = useMemo(() => (doctors || []).slice().sort((a, b) => a.lastName.localeCompare(b.lastName)), [doctors]);
@@ -50,10 +56,14 @@ export default function PrintWeek() {
             {options.map((d) => <option key={d.id} value={d.id}>{d.lastName} {d.firstName}{d.specialty ? ` – ${d.specialty}` : ''}</option>)}
           </select>
         )}
+        <div className="segmented" role="group" aria-label="Periodo">
+          <button className={period === 'day' ? 'on' : ''} onClick={() => set({ period: 'day' })}>Giorno</button>
+          <button className={period === 'week' ? 'on' : ''} onClick={() => set({ period: 'week' })}>Settimana</button>
+        </div>
         <div className="toolbar-group">
-          <button className="btn btn-icon" onClick={() => shift(-1)} aria-label="Settimana precedente">‹</button>
+          <button className="btn btn-icon" onClick={() => shift(-1)} aria-label={period === 'day' ? 'Giorno precedente' : 'Settimana precedente'}>‹</button>
           <input type="date" value={date} onChange={(e) => e.target.value && set({ date: e.target.value })} />
-          <button className="btn btn-icon" onClick={() => shift(1)} aria-label="Settimana successiva">›</button>
+          <button className="btn btn-icon" onClick={() => shift(1)} aria-label={period === 'day' ? 'Giorno successivo' : 'Settimana successiva'}>›</button>
         </div>
         <div className="toolbar-group" style={{ marginLeft: 'auto' }}>
           <button className="btn" disabled={!week || busy} onClick={pdf}>{busy ? 'Preparazione…' : 'Scarica PDF'}</button>
@@ -62,7 +72,7 @@ export default function PrintWeek() {
       </div>
 
       {err && <div className="alert no-print">{err}</div>}
-      {!doctorId && !isDoctor && <div className="empty no-print">Scegli il medico di cui stampare la settimana.</div>}
+      {!doctorId && !isDoctor && <div className="empty no-print">Scegli il medico di cui stampare l'agenda.</div>}
       {isDoctor && !doctorId && <div className="empty">Il tuo utente non è collegato a un medico: avvisa l'amministratore.</div>}
 
       {week && (
@@ -71,7 +81,7 @@ export default function PrintWeek() {
             <span>{week.clinic.name}</span>
             <span>Stampato il {week.printedAt}</span>
           </header>
-          <h1>Agenda settimanale – {week.doctor.name}</h1>
+          <h1>{week.title} – {week.doctor.name}</h1>
           <p className="print-sub">
             {[week.doctor.specialty, week.periodLabel, `${week.totals.count} appuntamenti`, `totale previsto ${euro(week.totals.amountCents)}`].filter(Boolean).join('  ·  ')}
           </p>
@@ -117,7 +127,7 @@ export default function PrintWeek() {
           ))}
 
           <footer className="print-total">
-            <b>Totale settimana: {week.totals.count} appuntamenti · {euro(week.totals.amountCents)}</b>
+            <b>{week.totalLabel}: {week.totals.count} appuntamenti · {euro(week.totals.amountCents)}</b>
             <span>Tariffe secondo il listino attuale; esclusi annullati e mancate presentazioni.</span>
           </footer>
         </article>
