@@ -34,6 +34,8 @@ app.use(express.json({ limit: '1mb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth').router);
 app.use('/api/public', require('./routes/public'));
+// copia di emergenza scaricata dai PC dello studio con la loro chiave (prima del login)
+app.use('/api/emergency', require('./routes/emergency').publicRouter);
 
 // Da qui in poi tutte le API richiedono il login
 app.use('/api', requireAuth);
@@ -45,6 +47,7 @@ app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/prints', require('./routes/prints'));
 app.use('/api/requests', require('./routes/requests'));
+app.use('/api/emergency', require('./routes/emergency').adminRouter);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint non trovato' }));
 
 // In produzione il backend serve anche il frontend compilato

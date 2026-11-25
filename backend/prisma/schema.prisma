@@ -261,3 +261,19 @@ model BookingRequest {
   @@index([doctorId, preferredStart])
   @@map("booking_requests")
 }
+
+/// PC dello studio autorizzato a scaricare la copia di emergenza dell'agenda (sola lettura)
+model EmergencyDevice {
+  id          Int       @id @default(autoincrement())
+  name        String
+  /// impronta SHA-256 della chiave: la chiave in chiaro viene mostrata una sola volta
+  tokenHash   String    @unique @map("token_hash")
+  tokenPrefix String    @map("token_prefix")
+  createdById Int?      @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  lastIp      String?   @map("last_ip")
+  revokedAt   DateTime? @map("revoked_at")
+
+  @@map("emergency_devices")
+}

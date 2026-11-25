@@ -300,3 +300,10 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
 .request-main { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 260px; }
 .request-who { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 1.05rem; }
 .request-actions { display: flex; gap: 8px; }
+
+/* ---- Postazioni di emergenza ---- */
+.key-box { border: 1px solid #fed7aa; background: #fff7ed; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.key-box p { margin: 0; }
+.key-box ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+code.key { font-family: ui-monospace, monospace; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; word-break: break-all; }
+pre.cmd { background: #0f2f3a; color: #e0f2f7; padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: .8rem; margin: 6px 0 0; }

@@ -26,7 +26,7 @@ export default function Layout() {
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
     { to: '/prestazioni', label: 'Prestazioni', icon: '📋' },
-    ...(isAdmin(user) ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }] : []),
+    ...(isAdmin(user) ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }, { to: '/postazioni', label: 'Postazioni di emergenza', icon: '🛟' }] : []),
   ];
   return (
     <div className="app">

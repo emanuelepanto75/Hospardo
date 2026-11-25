@@ -41,6 +41,10 @@ gli appuntamenti dei prossimi 6 giorni lavorativi, domenica esclusa:
 
 Lo stesso Excel si scarica dall'agenda con il pulsante **Excel 6 giorni**.
 
+**Copia di emergenza**: i PC dello studio scaricano ogni 15 minuti l'agenda dei prossimi giorni in un file
+consultabile anche senza internet (sola lettura). Postazioni autorizzate con chiave revocabile:
+[docs/EMERGENZA.md](docs/EMERGENZA.md).
+
 ## Aggiornare un'installazione esistente
 
 Con Docker bastano `git pull` e `docker compose up -d --build`. Senza Docker:

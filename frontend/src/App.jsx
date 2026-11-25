@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import Reminders from './pages/Reminders';
 import PrintWeek from './pages/PrintWeek';
 import Requests from './pages/Requests';
+import EmergencyDevices from './pages/EmergencyDevices';
 import Book from './pages/Book';
 import ManageAppointment from './pages/ManageAppointment';
 
@@ -34,6 +35,7 @@ function Private() {
         <Route path="/medici/:id" element={<DoctorDetail />} />
         <Route path="/prestazioni" element={<Services />} />
         {isAdmin(user) && <Route path="/utenti" element={<Users />} />}
+        {isAdmin(user) && <Route path="/postazioni" element={<EmergencyDevices />} />}
         <Route path="*" element={<Navigate to="/agenda" replace />} />
       </Route>
     </Routes>
