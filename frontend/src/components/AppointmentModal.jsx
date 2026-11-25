@@ -134,6 +134,9 @@ export default function AppointmentModal({ appointment, draft, doctors, services
               <div className="muted small">{[patient.phone, patient.email].filter(Boolean).join(' · ')}</div>
             </div>
             <Link className="btn btn-ghost btn-sm" to={`/pazienti/${patient.id}`}>Scheda paziente</Link>
+            {user.dental && doctor?.isDentist && (
+              <Link className="btn btn-ghost btn-sm" to={`/pazienti/${patient.id}#odontoiatria`}>Cartella dentale</Link>
+            )}
           </div>
         )}
 

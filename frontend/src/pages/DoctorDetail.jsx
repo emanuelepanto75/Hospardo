@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { DateTime, WEEKDAYS, fmtDateTime, euro } from '../lib/time';
 import { doctorName, groupByCategory, isAdmin as isAdminUser } from '../lib/constants';
 
-const emptyDoctor = { title: 'Dott.', firstName: '', lastName: '', specialty: '', email: '', phone: '', color: '#2563eb', bio: '', active: true, bookableOnline: true, slotStepMin: 15 };
+const emptyDoctor = { title: 'Dott.', firstName: '', lastName: '', specialty: '', email: '', phone: '', color: '#2563eb', bio: '', active: true, bookableOnline: true, slotStepMin: 15, isDentist: false };
 
 export default function DoctorDetail() {
   const { id } = useParams();
@@ -52,7 +52,7 @@ function DoctorForm({ initial, readOnly, onSaved }) {
     const body = {
       title: f.title, firstName: f.firstName, lastName: f.lastName, specialty: f.specialty || null, email: f.email || null,
       phone: f.phone || null, color: f.color, bio: f.bio || null, active: f.active, bookableOnline: f.bookableOnline,
-      slotStepMin: Number(f.slotStepMin),
+      slotStepMin: Number(f.slotStepMin), isDentist: f.isDentist,
     };
     try {
       const saved = initial.id ? await api(`/doctors/${initial.id}`, { method: 'PUT', body }) : await api('/doctors', { method: 'POST', body });
@@ -81,6 +81,7 @@ function DoctorForm({ initial, readOnly, onSaved }) {
         <div className="row">
           <label className="check"><input type="checkbox" checked={f.active} onChange={set('active')} /> Attivo</label>
           <label className="check"><input type="checkbox" checked={f.bookableOnline} onChange={set('bookableOnline')} /> Prenotabile online</label>
+          <label className="check" title="Accede alla cartella dentale (odontogramma e trattamenti) dei pazienti"><input type="checkbox" checked={f.isDentist} onChange={set('isDentist')} /> Odontoiatra</label>
         </div>
       </fieldset>
       {msg && <div className={msg.ok ? 'notice' : 'alert'}>{msg.text}</div>}

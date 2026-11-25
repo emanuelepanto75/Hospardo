@@ -5,6 +5,8 @@ import { fmtDateTime } from '../lib/time';
 import { STATUS, doctorName } from '../lib/constants';
 import PatientForm from '../components/PatientForm';
 import AppointmentModal from '../components/AppointmentModal';
+import DentalChart from '../components/DentalChart';
+import { useAuth } from '../lib/auth';
 
 export default function PatientDetail() {
   const { id } = useParams();
@@ -13,6 +15,7 @@ export default function PatientDetail() {
   const { data: services } = useApi('/services');
   const [editing, setEditing] = useState(false);
   const [booking, setBooking] = useState(false);
+  const { user } = useAuth();
 
   if (error) return <div className="page"><div className="alert">{error.message}</div></div>;
   if (!p) return <div className="page"><p className="muted">Caricamento…</p></div>;
@@ -58,6 +61,8 @@ export default function PatientDetail() {
           <div className="card"><div className="muted small">Note</div><div>{p.notes || <span className="muted">—</span>}</div></div>
         </div>
       )}
+
+      {user.dental && <DentalChart patientId={p.id} user={user} />}
 
       <h2>Prossimi appuntamenti</h2>
       {upcoming.length === 0 ? <div className="empty">Nessun appuntamento in programma.</div> : (

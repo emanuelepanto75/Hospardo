@@ -17,6 +17,7 @@ const doctorSchema = z.object({
   active: z.boolean().optional(),
   bookableOnline: z.boolean().optional(),
   slotStepMin: z.number().int().min(5).max(120).optional(),
+  isDentist: z.boolean().optional(),
   serviceIds: z.array(z.number().int()).optional(),
 });
 

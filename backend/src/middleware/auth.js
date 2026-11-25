@@ -14,7 +14,7 @@ async function requireAuth(req, res, next) {
     } catch {
       throw new HttpError(401, 'Sessione scaduta, effettua di nuovo l\'accesso');
     }
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await prisma.user.findUnique({ where: { id: payload.sub }, include: { doctor: { select: { isDentist: true, active: true } } } });
     if (!user || !user.active) throw new HttpError(401, 'Utente non attivo');
     req.user = user;
     next();
@@ -25,6 +25,8 @@ async function requireAuth(req, res, next) {
 
 const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
 const isAdmin = (user) => !!user && ADMIN_ROLES.includes(user.role);
+/** Accesso alla cartella dentale: amministratori e medici odontoiatri (l'utente deve includere `doctor`) */
+const canDental = (user) => isAdmin(user) || (user?.role === 'MEDICO' && !!user.doctor?.isDentist);
 
 /** Ruoli ammessi. 'ADMIN' comprende anche l'amministratore principale (SUPERADMIN). */
 const requireRole = (...roles) => {
@@ -39,4 +41,4 @@ function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
 }
 
-module.exports = { requireAuth, requireRole, signToken, isAdmin, ADMIN_ROLES };
+module.exports = { requireAuth, requireRole, signToken, isAdmin, canDental, ADMIN_ROLES };

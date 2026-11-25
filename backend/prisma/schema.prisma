@@ -86,6 +86,8 @@ model Doctor {
   bookableOnline Boolean       @default(true) @map("bookable_online")
   /// Granularità degli slot proposti (minuti)
   slotStepMin   Int            @default(15) @map("slot_step_min")
+  /// odontoiatra: accede alla cartella dentale dei pazienti
+  isDentist     Boolean        @default(false) @map("is_dentist")
   createdAt     DateTime       @default(now()) @map("created_at")
 
   user          User?
@@ -94,6 +96,7 @@ model Doctor {
   timeOff       TimeOff[]
   appointments  Appointment[]
   requests      BookingRequest[]
+  dentalTreatments DentalTreatment[]
 
   @@map("doctors")
 }
@@ -114,6 +117,7 @@ model Service {
   doctors        DoctorService[]
   appointments   Appointment[]
   requests       BookingRequest[]
+  dentalTreatments DentalTreatment[]
 
   @@map("services")
 }
@@ -178,6 +182,8 @@ model Patient {
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   appointments   Appointment[]
+  dentalTeeth    DentalTooth[]
+  dentalTreatments DentalTreatment[]
 
   @@index([lastName, firstName])
   @@map("patients")
@@ -203,6 +209,7 @@ model Appointment {
   createdById        Int?              @map("created_by_id")
   notifications      Notification[]
   request            BookingRequest?
+  dentalTreatments   DentalTreatment[]
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -276,4 +283,48 @@ model EmergencyDevice {
   revokedAt   DateTime? @map("revoked_at")
 
   @@map("emergency_devices")
+}
+
+/// Stato attuale di un dente del paziente (numerazione FDI: 11-48 permanenti, 51-85 decidui)
+model DentalTooth {
+  id          Int      @id @default(autoincrement())
+  patientId   Int      @map("patient_id")
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tooth       Int
+  /// SANO, CARIE, OTTURATO, DEVITALIZZATO, CORONA, IMPIANTO, PONTE, MANCANTE, DA_ESTRARRE
+  status      String   @default("SANO")
+  /// condizione delle superfici: { "O": "CARIE", "M": "OTTURAZIONE", ... } (O, M, D, V, L)
+  surfaces    Json     @default("{}")
+  note        String?
+  updatedById Int?     @map("updated_by_id")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([patientId, tooth])
+  @@map("dental_teeth")
+}
+
+/// Diario dei trattamenti odontoiatrici eseguiti
+model DentalTreatment {
+  id            Int          @id @default(autoincrement())
+  patientId     Int          @map("patient_id")
+  patient       Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  date          DateTime     @db.Date
+  /// dente FDI (null = trattamento generale, es. igiene)
+  tooth         Int?
+  /// superfici trattate, es. "OM"
+  surfaces      String?
+  serviceId     Int?         @map("service_id")
+  service       Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  doctorId      Int          @map("doctor_id")
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  appointmentId Int?         @map("appointment_id")
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  description   String
+  notes         String?
+  createdById   Int?         @map("created_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([patientId, date])
+  @@map("dental_treatments")
 }

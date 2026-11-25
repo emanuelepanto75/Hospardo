@@ -307,3 +307,18 @@ fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: colu
 .key-box ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 code.key { font-family: ui-monospace, monospace; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; word-break: break-all; }
 pre.cmd { background: #0f2f3a; color: #e0f2f7; padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: .8rem; margin: 6px 0 0; }
+
+/* Cartella dentale */
+.nowrap { white-space: nowrap; }
+ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.dental-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.dental-layout > .card { margin-bottom: 16px; }
+.odontogram-card { overflow-x: auto; }
+.odontogram { width: 100%; min-width: 560px; height: auto; display: block; user-select: none; }
+.odontogram .tooth polygon:hover { opacity: .75; }
+.tooth-panel { width: 320px; }
+.tooth-panel h4 { margin: 16px 0 6px; }
+.surface-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; color: #4b5563; }
+.legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #94a3b8; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+@media (max-width: 900px) { .dental-layout { grid-template-columns: 1fr; } .tooth-panel { width: auto; } }

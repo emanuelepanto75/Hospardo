@@ -19,6 +19,10 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   - medico non più in servizio: **eliminazione** (se senza storico) o **archiviazione**, con annullamento
     e avviso ai pazienti degli appuntamenti futuri
 - **Prestazioni**: categoria (es. Odontoiatria), durata, prezzo, medici abilitati, prenotabilità online
+- **Odontoiatria – cartella dentale** (solo medici con la spunta *Odontoiatra* e amministratori):
+  odontogramma con numerazione FDI (permanenti e da latte), stato di ogni dente e delle 5 superfici
+  (carie, otturazione), note; **diario dei trattamenti** collegabile agli appuntamenti, con aggiornamento
+  dello stato del dente
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**
