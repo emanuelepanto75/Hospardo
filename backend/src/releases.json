@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.13.2",
+    "date": "2026-11-26",
+    "title": "Promemoria WhatsApp più veloci",
+    "items": [
+      "Invio dei promemoria in sequenza: un paziente dopo l'altro con il solo tasto Invio",
+      "WhatsApp si apre direttamente nell'app del PC (predefinito), senza la pagina di anteprima; WhatsApp Web riusa sempre la stessa scheda"
+    ]
+  },
+  {
     "version": "1.13.1",
     "date": "2026-11-26",
     "title": "PDF nel promemoria ai medici",

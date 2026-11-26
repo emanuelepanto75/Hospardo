@@ -4,7 +4,7 @@ import { DateTime, fmtTime } from '../lib/time';
 import { doctorName, NOTIFICATION_STATUS } from '../lib/constants';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { useAuth } from '../lib/auth';
-import { waHref } from '../lib/whatsapp';
+import { waHref, waTarget, openWhatsapp } from '../lib/whatsapp';
 import { WA_MODES, getWaMode, setWaMode } from '../lib/whatsapp';
 
 /**
@@ -49,6 +49,19 @@ function PatientReminders({ onTab }) {
   const items = data?.items || [];
   const sendable = items.filter((a) => a.whatsapp && a.patient.whatsappOptIn);
   const sent = sendable.filter((a) => a.whatsappSentAt).length;
+  const toSend = sendable.filter((a) => !a.whatsappSentAt);
+
+  // invio in sequenza: un paziente dopo l'altro, con un solo pulsante (o Invio da tastiera)
+  const [queue, setQueue] = useState(null); // { ids: [...], pos }
+  const current = queue && items.find((a) => a.id === queue.ids[queue.pos]);
+  const startQueue = () => setQueue({ ids: toSend.map((a) => a.id), pos: 0 });
+  const next = () => setQueue((q) => (q.pos + 1 < q.ids.length ? { ...q, pos: q.pos + 1 } : null));
+  function sendCurrent() {
+    const a = current;
+    openWhatsapp(a.whatsapp.url);
+    api(`/appointments/${a.id}/whatsapp`, { method: 'POST', body: { kind: 'PROMEMORIA' } }).then(() => markSent(a.id)).catch(() => {});
+    next();
+  }
 
   return (
     <div className="page">
@@ -77,6 +90,24 @@ function PatientReminders({ onTab }) {
             <div className="card"><div className="muted small">Senza WhatsApp</div><div className="big">{items.length - sendable.length}</div>
               <div className="muted small">nessun cellulare o non lo desiderano: chiamali</div></div>
           </div>
+          {toSend.length > 0 && !queue && (
+            <div className="queue-start">
+              <button className="btn btn-wa" onClick={startQueue}>Invia i promemoria in sequenza ({toSend.length})</button>
+              <span className="muted small">Si apre un paziente alla volta: premi Invio in WhatsApp, torna qui e premi Invio per il successivo.</span>
+            </div>
+          )}
+          {queue && current && (
+            <div className="queue-panel" role="dialog" aria-label="Invio in sequenza">
+              <div className="queue-progress">Promemoria {queue.pos + 1} di {queue.ids.length}</div>
+              <div className="queue-who"><b>{current.patient.lastName} {current.patient.firstName}</b> · {fmtTime(current.start)} · {doctorName(current.doctor)} · {current.patient.phone}</div>
+              <div className="row-end">
+                <button className="btn" onClick={() => setQueue(null)}>Interrompi</button>
+                <button className="btn" onClick={next}>Salta</button>
+                <button className="btn btn-wa" autoFocus key={current.id} onClick={sendCurrent}>Apri WhatsApp ⏎</button>
+              </div>
+            </div>
+          )}
+          {queue && !current && null}
           {items.length === 0 ? <div className="empty">Nessun appuntamento da ricordare per questo giorno.</div> : (
             <div className="table-wrap">
               <table className="table">
@@ -197,7 +228,7 @@ function DoctorReminders({ onTab }) {
                     </td>
                     <td>
                       {r.whatsapp
-                        ? <a className="btn btn-wa btn-sm" href={waHref(r.whatsapp.url)} target={waHref(r.whatsapp.url).startsWith('whatsapp:') ? undefined : '_blank'} rel="noopener noreferrer" onClick={() => logWhatsapp(r)}>WhatsApp</a>
+                        ? <a className="btn btn-wa btn-sm" href={waHref(r.whatsapp.url)} target={waTarget(waHref(r.whatsapp.url))} rel="noopener noreferrer" onClick={() => logWhatsapp(r)}>WhatsApp</a>
                         : <span className="muted small">nessun cellulare</span>}
                       {r.whatsappSent && <div className="muted small">✓ aperto il {DateTime.fromISO(r.whatsappSent.createdAt).toFormat("dd/LL 'alle' HH:mm")}</div>}
                     </td>
