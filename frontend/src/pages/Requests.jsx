@@ -1,3 +1,4 @@
+import DoctorSelect from '../components/DoctorSelect';
 import { useEffect, useMemo, useState } from 'react';
 import { api, errorMessage } from '../lib/api';
 import { useApi } from '../lib/useApi';
@@ -182,9 +183,7 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
         </div>
         <div className="grid2">
           <label>Medico
-            <select value={doctorId} onChange={(e) => { setDoctorId(Number(e.target.value)); }}>
-              {doctors.filter((d) => (d.active && !d.archivedAt) || d.id === request.doctorId).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
-            </select>
+            <DoctorSelect value={doctorId} onChange={setDoctorId} doctors={doctors.filter((d) => (d.active && !d.archivedAt) || d.id === request.doctorId)} />
           </label>
           <label>Prestazione
             <select value={serviceId} onChange={(e) => setServiceId(Number(e.target.value))}>

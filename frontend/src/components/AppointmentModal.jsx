@@ -7,6 +7,7 @@ import { DateTime, fmtTime, fmtDateTime } from '../lib/time';
 import { STATUS, doctorName, groupByCategory, NOTIFICATION_KIND, NOTIFICATION_STATUS } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import WhatsAppButton from './WhatsAppButton';
+import DoctorSelect from './DoctorSelect';
 
 /**
  * Creazione / modifica di un appuntamento.
@@ -165,9 +166,8 @@ export default function AppointmentModal({ appointment, draft, doctors, services
 
         <div className="grid2">
           <label>Medico
-            <select value={doctorId} disabled={readOnly} onChange={(e) => setDoctorId(Number(e.target.value))}>
-              {doctors.filter((d) => ((d.active && !d.archivedAt) || d.id === Number(doctorId)) && (user.role !== 'MEDICO' || d.id === user.doctorId)).map((d) => <option key={d.id} value={d.id}>{doctorName(d)}</option>)}
-            </select>
+            <DoctorSelect value={doctorId} disabled={readOnly} onChange={setDoctorId}
+              doctors={doctors.filter((d) => ((d.active && !d.archivedAt) || d.id === Number(doctorId)) && (user.role !== 'MEDICO' || d.id === user.doctorId))} />
           </label>
           <label>Prestazione
             <select value={serviceId} disabled={readOnly} onChange={(e) => onService(e.target.value)}>

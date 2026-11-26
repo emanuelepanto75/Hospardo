@@ -421,3 +421,9 @@ label.inline { display: inline-flex !important; flex-direction: row !important; 
 .update-notice { background: #fef3c7; border-bottom: 1px solid #fcd34d; padding: 8px 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: .92rem; }
 .release.current { border-left: 4px solid #16a34a; }
 .release ul { margin: 8px 0 0; padding-left: 20px; }
+.subrow { background: #fafbfc; padding: 4px 14px 10px 40px !important; } .table.compact td { padding: 5px 10px; border-bottom: 1px solid var(--border); }
+.doctor-select .ac-list { max-height: 280px; }
+.ac-list .ac-item.hi { background: var(--primary-soft); }
+.ac-list .ac-item.sel b { color: var(--primary); }
+div.doctor-add { padding: 0; min-width: 320px; border-radius: 0; }
+div.doctor-add input { border-radius: 99px; padding: 5px 12px; font-size: .88rem; }

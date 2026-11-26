@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { DateTime, hmToMin, minToHm } from '../lib/time';
 import { STATUS, doctorName } from '../lib/constants';
 import AppointmentModal from '../components/AppointmentModal';
+import DoctorSelect from '../components/DoctorSelect';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { download, errorMessage } from '../lib/api';
 
@@ -232,10 +233,10 @@ export default function Agenda() {
                 </span>
               ))}
               {otherDoctors.length > 0 && (
-                <select className="doctor-add" value="" onChange={(e) => e.target.value && setExtraIds([...extraIds, Number(e.target.value)])}>
-                  <option value="">+ Mostra un altro medico…</option>
-                  {otherDoctors.slice().sort(byName).map((d) => <option key={d.id} value={d.id}>{d.lastName} {d.firstName}{d.specialty ? ` – ${d.specialty}` : ''}</option>)}
-                </select>
+                <div className="doctor-add">
+                  <DoctorSelect value="" placeholder="+ Mostra un altro medico (scrivi il nome)…" doctors={otherDoctors.slice().sort(byName)}
+                    onChange={(id) => setExtraIds([...extraIds, Number(id)])} />
+                </div>
               )}
             </>
           ) : (

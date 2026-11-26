@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.13.0",
+    "date": "2026-11-26",
+    "title": "Promemoria ai medici e ricerca del medico",
+    "items": [
+      "Promemoria ai medici: per ognuno la prima data utile con appuntamenti, elenco via email o WhatsApp (Promemoria → Medici)",
+      "Scelta del medico scrivendo le prime lettere del cognome, del nome o della specializzazione (appuntamento, richieste, agenda)"
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-11-26",
     "title": "Pazienti, orari e magazzino",
@@ -38,13 +47,18 @@
     "version": "1.9.0",
     "date": "2026-11-25",
     "title": "Cartella dentale",
-    "items": ["Odontogramma con stato di denti e superfici", "Diario dei trattamenti collegato agli appuntamenti"]
+    "items": [
+      "Odontogramma con stato di denti e superfici",
+      "Diario dei trattamenti collegato agli appuntamenti"
+    ]
   },
   {
     "version": "1.8.0",
     "date": "2026-11-25",
     "title": "Copia di emergenza",
-    "items": ["Agenda consultabile in sola lettura sui PC dello studio anche senza internet"]
+    "items": [
+      "Agenda consultabile in sola lettura sui PC dello studio anche senza internet"
+    ]
   },
   {
     "version": "1.7.0",
@@ -60,30 +74,46 @@
     "version": "1.6.0",
     "date": "2026-11-23",
     "title": "Tariffario e stampe",
-    "items": ["Importazione del tariffario (medici, prestazioni, durate, tariffe)", "Stampa settimanale del singolo medico in PDF"]
+    "items": [
+      "Importazione del tariffario (medici, prestazioni, durate, tariffe)",
+      "Stampa settimanale del singolo medico in PDF"
+    ]
   },
   {
     "version": "1.5.0",
     "date": "2026-11-23",
     "title": "Sito e ruoli",
-    "items": ["Sito pubblico hospardo.it e agenda su app.hospardo.it", "Ruoli: amministratore principale, amministratore, segreteria, medico"]
+    "items": [
+      "Sito pubblico hospardo.it e agenda su app.hospardo.it",
+      "Ruoli: amministratore principale, amministratore, segreteria, medico"
+    ]
   },
   {
     "version": "1.4.0",
     "date": "2026-11-17",
     "title": "WhatsApp e riepilogo serale",
-    "items": ["WhatsApp con un clic e pagina Promemoria", "Email serale con Excel e calendario dei prossimi giorni", "Backup automatico notturno"]
+    "items": [
+      "WhatsApp con un clic e pagina Promemoria",
+      "Email serale con Excel e calendario dei prossimi giorni",
+      "Backup automatico notturno"
+    ]
   },
   {
     "version": "1.3.0",
     "date": "2026-11-16",
     "title": "Prestazioni per medico e messaggi",
-    "items": ["Prestazioni, durate e prezzi per medico; archiviazione dei medici", "Email di conferma, promemoria, spostamento e annullamento", "Avvio con Docker"]
+    "items": [
+      "Prestazioni, durate e prezzi per medico; archiviazione dei medici",
+      "Email di conferma, promemoria, spostamento e annullamento",
+      "Avvio con Docker"
+    ]
   },
   {
     "version": "1.0.0",
     "date": "2026-11-12",
     "title": "Prima versione",
-    "items": ["Agenda multi-medico, pazienti, prestazioni, orari e assenze"]
+    "items": [
+      "Agenda multi-medico, pazienti, prestazioni, orari e assenze"
+    ]
   }
 ]

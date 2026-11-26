@@ -100,6 +100,7 @@ model Doctor {
   dentalTreatments DentalTreatment[]
   treatmentPlans TreatmentPlan[]
   stockDrafts    StockUnloadDraft[]
+  reminders      DoctorReminder[]
 
   @@map("doctors")
 }
@@ -557,4 +558,22 @@ model StockUnloadDraft {
 
   @@index([doctorId, date])
   @@map("stock_unload_drafts")
+}
+
+/// Promemoria inviato a un medico con i suoi appuntamenti di una data
+model DoctorReminder {
+  id          Int                 @id @default(autoincrement())
+  doctorId    Int                 @map("doctor_id")
+  doctor      Doctor              @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date        DateTime            @db.Date
+  channel     NotificationChannel
+  status      NotificationStatus
+  recipient   String
+  count       Int                 @default(0)
+  error       String?
+  sentById    Int?                @map("sent_by_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  @@index([doctorId, date])
+  @@map("doctor_reminders")
 }
