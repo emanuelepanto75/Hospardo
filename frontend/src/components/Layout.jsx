@@ -24,6 +24,7 @@ export default function Layout() {
     ...(canHandleRequests ? [{ to: '/richieste', label: 'Richieste', icon: '📥', badge: pending }] : []),
     { to: '/promemoria', label: 'Promemoria', icon: '💬' },
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
+    ...(user.plans ? [{ to: '/piani', label: 'Piani di cura', icon: '🦷' }] : []),
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
     { to: '/prestazioni', label: 'Prestazioni', icon: '📋' },
     ...(isAdmin(user) ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }, { to: '/postazioni', label: 'Postazioni di emergenza', icon: '🛟' }] : []),

@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { ah, HttpError } = require('../lib/errors');
-const { requireAuth, signToken, canDental } = require('../middleware/auth');
+const { requireAuth, signToken, canDental, canPlans } = require('../middleware/auth');
 const { rateLimit } = require('../lib/rateLimit');
 
 // Protezione dai tentativi ripetuti di indovinare la password
@@ -16,7 +16,7 @@ const loginLimiter = rateLimit({
 });
 const loginIpLimiter = rateLimit({ max: 50, windowMs: 15 * 60 * 1000, keyFn: (req) => `ip:${req.ip}`, message: 'Troppi tentativi di accesso. Riprova tra 15 minuti.' });
 
-const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, doctorId: u.doctorId, dental: canDental(u) });
+const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, doctorId: u.doctorId, dental: canDental(u), plans: canPlans(u) });
 
 router.post('/login', loginIpLimiter, loginLimiter, ah(async (req, res) => {
   const { email, password } = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);

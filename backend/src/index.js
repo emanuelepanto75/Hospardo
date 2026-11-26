@@ -48,6 +48,7 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/prints', require('./routes/prints'));
 app.use('/api/requests', require('./routes/requests'));
 app.use('/api/dental', require('./routes/dental'));
+app.use('/api/plans', require('./routes/plans'));
 app.use('/api/emergency', require('./routes/emergency').adminRouter);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint non trovato' }));
 

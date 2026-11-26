@@ -314,7 +314,7 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-directio
 .dental-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
 .dental-layout > .card { margin-bottom: 16px; }
 .odontogram-card { overflow-x: auto; }
-.odontogram { width: 100%; min-width: 560px; height: auto; display: block; user-select: none; }
+.odontogram { width: 100%; max-width: 860px; margin: 0 auto; min-width: 560px; height: auto; display: block; user-select: none; }
 .odontogram .tooth polygon:hover { opacity: .75; }
 .tooth-panel { width: 320px; }
 .tooth-panel h4 { margin: 16px 0 6px; }
@@ -323,3 +323,22 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-directio
 .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #94a3b8; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 @media (max-width: 900px) { .dental-layout { grid-template-columns: 1fr; } .tooth-panel { width: auto; } }
 .dental-off { margin-top: 24px; border-left: 4px solid var(--primary); }
+
+/* Piani di cura */
+.warn-text { color: #b45309; font-weight: 600; }
+.plan-card { padding: 14px 18px; }
+.plan-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.plan-total { text-align: right; }
+.plan-total .big { font-size: 1.3rem; font-weight: 700; }
+.table tr.done td { background: #f0fdf4; }
+.table tfoot td { padding: 10px 14px; border-top: 1px solid var(--border); background: #fafbfc; }
+.plan-items td { padding: 6px 8px; vertical-align: middle; }
+.plan-items select { max-width: 200px; }
+.plan-items input.w-tooth { width: 54px; }
+.plan-items input.w-surf { width: 64px; }
+.plan-items input.w-qty { width: 58px; }
+input.w-price { width: 90px; }
+.plan-sum { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.plan-sum label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.big-inline { font-size: 1.15rem; }
+.done-form { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 12px; }

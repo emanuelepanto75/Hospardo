@@ -27,6 +27,8 @@ const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
 const isAdmin = (user) => !!user && ADMIN_ROLES.includes(user.role);
 /** Accesso alla cartella dentale: amministratori e medici odontoiatri (l'utente deve includere `doctor`) */
 const canDental = (user) => isAdmin(user) || (user?.role === 'MEDICO' && !!user.doctor?.isDentist);
+/** piani di cura e preventivi: anche la segreteria */
+const canPlans = (user) => canDental(user) || user?.role === 'SEGRETERIA';
 
 /** Ruoli ammessi. 'ADMIN' comprende anche l'amministratore principale (SUPERADMIN). */
 const requireRole = (...roles) => {
@@ -41,4 +43,4 @@ function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
 }
 
-module.exports = { requireAuth, requireRole, signToken, isAdmin, canDental, ADMIN_ROLES };
+module.exports = { requireAuth, requireRole, signToken, isAdmin, canDental, canPlans, ADMIN_ROLES };

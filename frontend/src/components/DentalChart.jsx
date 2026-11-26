@@ -235,7 +235,7 @@ function TreatmentForm({ base, initial, dentists, services, appointments, defaul
 }
 
 /** Sezione Odontoiatria della scheda paziente (odontoiatri e amministratori) */
-export default function DentalChart({ patientId, user }) {
+export default function DentalChart({ patientId, user, onEnabledChange }) {
   const base = `/dental/patients/${patientId}`;
   const { data, error, reload } = useApi(base);
   const [deciduous, setDeciduous] = useState(false);
@@ -277,7 +277,7 @@ export default function DentalChart({ patientId, user }) {
   async function setEnabled(enabled) {
     if (!enabled && !window.confirm('Disattivare la cartella dentale di questo paziente? Potrai riattivarla in qualsiasi momento.')) return;
     setMsg(null);
-    try { await api(`${base}/enabled`, { method: 'PUT', body: { enabled } }); setSelected(null); setForm(null); reload(); } catch (e) { setMsg(errorMessage(e)); }
+    try { await api(`${base}/enabled`, { method: 'PUT', body: { enabled } }); setSelected(null); setForm(null); reload(); onEnabledChange?.(); } catch (e) { setMsg(errorMessage(e)); }
   }
 
   if (!data.dentalEnabled) {

@@ -11,7 +11,7 @@ import WhatsAppButton from './WhatsAppButton';
 /**
  * Creazione / modifica di un appuntamento.
  * - appointment: appuntamento esistente (modifica)
- * - draft: { doctorId, start } per un nuovo appuntamento
+ * - draft: { doctorId, start, patient, serviceId, durationMin, notes } per un nuovo appuntamento
  */
 export default function AppointmentModal({ appointment, draft, doctors, services, onClose, onSaved }) {
   const { user } = useAuth();
@@ -21,11 +21,11 @@ export default function AppointmentModal({ appointment, draft, doctors, services
 
   const [patient, setPatient] = useState(appointment?.patient || draft?.patient || null);
   const [doctorId, setDoctorId] = useState(src.doctorId || (user.doctorId ?? doctors[0]?.id));
-  const [serviceId, setServiceId] = useState(appointment?.serviceId ?? '');
+  const [serviceId, setServiceId] = useState(appointment?.serviceId ?? draft?.serviceId ?? '');
   const [date, setDate] = useState(startDt.toISODate());
   const [time, setTime] = useState(startDt.toFormat('HH:mm'));
-  const [duration, setDuration] = useState(appointment ? Math.round((new Date(appointment.end) - new Date(appointment.start)) / 60000) : 30);
-  const [notes, setNotes] = useState(appointment?.notes || '');
+  const [duration, setDuration] = useState(appointment ? Math.round((new Date(appointment.end) - new Date(appointment.start)) / 60000) : draft?.durationMin || 30);
+  const [notes, setNotes] = useState(appointment?.notes || draft?.notes || '');
   const [status, setStatus] = useState(appointment?.status || 'PRENOTATO');
   const [sendEmail, setSendEmail] = useState(true);
   const [slots, setSlots] = useState([]);

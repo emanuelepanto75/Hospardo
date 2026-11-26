@@ -97,6 +97,7 @@ model Doctor {
   appointments  Appointment[]
   requests      BookingRequest[]
   dentalTreatments DentalTreatment[]
+  treatmentPlans TreatmentPlan[]
 
   @@map("doctors")
 }
@@ -118,6 +119,7 @@ model Service {
   appointments   Appointment[]
   requests       BookingRequest[]
   dentalTreatments DentalTreatment[]
+  planItems      TreatmentPlanItem[]
 
   @@map("services")
 }
@@ -186,6 +188,7 @@ model Patient {
   appointments   Appointment[]
   dentalTeeth    DentalTooth[]
   dentalTreatments DentalTreatment[]
+  treatmentPlans TreatmentPlan[]
 
   @@index([lastName, firstName])
   @@map("patients")
@@ -212,6 +215,7 @@ model Appointment {
   notifications      Notification[]
   request            BookingRequest?
   dentalTreatments   DentalTreatment[]
+  planItems          TreatmentPlanItem[]
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -326,7 +330,75 @@ model DentalTreatment {
   createdById   Int?         @map("created_by_id")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
+  planItem      TreatmentPlanItem?
 
   @@index([patientId, date])
   @@map("dental_treatments")
+}
+
+enum PlanStatus {
+  PROPOSTO   // preventivo consegnato, in attesa di risposta
+  ACCETTATO  // il paziente ha accettato: si prenotano le sedute
+  COMPLETATO
+  RIFIUTATO
+}
+
+enum PlanItemStatus {
+  DA_FARE
+  PROGRAMMATO // seduta prenotata in agenda
+  ESEGUITO
+}
+
+/// Piano di cura odontoiatrico, che fa anche da preventivo
+model TreatmentPlan {
+  id            Int        @id @default(autoincrement())
+  /// numero del preventivo, progressivo per anno (es. 2026/12)
+  year          Int
+  number        Int
+  patientId     Int        @map("patient_id")
+  patient       Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId      Int        @map("doctor_id")
+  doctor        Doctor     @relation(fields: [doctorId], references: [id])
+  title         String
+  status        PlanStatus @default(PROPOSTO)
+  /// sconto sul totale, in centesimi
+  discountCents Int        @default(0) @map("discount_cents")
+  validUntil    DateTime?  @map("valid_until") @db.Date
+  /// note stampate sul preventivo (modalità di pagamento, ecc.)
+  notes         String?
+  acceptedAt    DateTime?  @map("accepted_at")
+  createdById   Int?       @map("created_by_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  items         TreatmentPlanItem[]
+
+  @@unique([year, number])
+  @@index([patientId])
+  @@index([status])
+  @@map("treatment_plans")
+}
+
+model TreatmentPlanItem {
+  id             Int              @id @default(autoincrement())
+  planId         Int              @map("plan_id")
+  plan           TreatmentPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  position       Int              @default(0)
+  serviceId      Int?             @map("service_id")
+  service        Service?         @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  description    String
+  tooth          Int?
+  surfaces       String?
+  quantity       Int              @default(1)
+  unitPriceCents Int              @default(0) @map("unit_price_cents")
+  status         PlanItemStatus   @default(DA_FARE)
+  /// seduta prenotata
+  appointmentId  Int?             @map("appointment_id")
+  appointment    Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  /// trattamento registrato nel diario quando la voce è eseguita
+  treatmentId    Int?             @unique @map("treatment_id")
+  treatment      DentalTreatment? @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  doneAt         DateTime?        @map("done_at")
+
+  @@index([planId])
+  @@map("treatment_plan_items")
 }

@@ -23,6 +23,10 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   odontogramma con numerazione FDI (permanenti e da latte), stato di ogni dente e delle 5 superfici
   (carie, otturazione), note; **diario dei trattamenti** collegabile agli appuntamenti, con aggiornamento
   dello stato del dente
+- **Piani di cura e preventivi** (odontoiatri, segreteria, amministratori): voci per dente con prezzi del
+  dentista, sconto, validità, **preventivo PDF** numerato con firma di accettazione; stati proposto / accettato /
+  completato / rifiutato; **prenotazione delle sedute** direttamente dalle voci del piano; "eseguito" (solo
+  odontoiatri) registra il trattamento nel diario. Pagina **Piani di cura** con tutti i preventivi da seguire
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**

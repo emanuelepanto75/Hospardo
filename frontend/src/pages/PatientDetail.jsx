@@ -6,6 +6,7 @@ import { STATUS, doctorName } from '../lib/constants';
 import PatientForm from '../components/PatientForm';
 import AppointmentModal from '../components/AppointmentModal';
 import DentalChart from '../components/DentalChart';
+import TreatmentPlans from '../components/TreatmentPlans';
 import { useAuth } from '../lib/auth';
 
 export default function PatientDetail() {
@@ -16,6 +17,7 @@ export default function PatientDetail() {
   const [editing, setEditing] = useState(false);
   const [booking, setBooking] = useState(false);
   const { user } = useAuth();
+  const [dentalVersion, setDentalVersion] = useState(0);
 
   if (error) return <div className="page"><div className="alert">{error.message}</div></div>;
   if (!p) return <div className="page"><p className="muted">Caricamento…</p></div>;
@@ -62,7 +64,8 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {user.dental && <DentalChart patientId={p.id} user={user} />}
+      {user.dental && <DentalChart key={dentalVersion} patientId={p.id} user={user} onEnabledChange={reload} />}
+      {user.plans && p.dentalEnabled && <TreatmentPlans patient={p} user={user} onChanged={() => { reload(); setDentalVersion((v) => v + 1); }} />}
 
       <h2>Prossimi appuntamenti</h2>
       {upcoming.length === 0 ? <div className="empty">Nessun appuntamento in programma.</div> : (

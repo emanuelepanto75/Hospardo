@@ -15,6 +15,7 @@ import PrintWeek from './pages/PrintWeek';
 import Requests from './pages/Requests';
 import EmergencyDevices from './pages/EmergencyDevices';
 import Book from './pages/Book';
+import Plans from './pages/Plans';
 import ManageAppointment from './pages/ManageAppointment';
 
 function Private() {
@@ -34,6 +35,7 @@ function Private() {
         <Route path="/medici" element={<Doctors />} />
         <Route path="/medici/:id" element={<DoctorDetail />} />
         <Route path="/prestazioni" element={<Services />} />
+        {user.plans && <Route path="/piani" element={<Plans />} />}
         {isAdmin(user) && <Route path="/utenti" element={<Users />} />}
         {isAdmin(user) && <Route path="/postazioni" element={<EmergencyDevices />} />}
         <Route path="*" element={<Navigate to="/agenda" replace />} />
