@@ -11,6 +11,7 @@ const { canPlans, canDental, isAdmin } = require('../middleware/auth');
 const { ALL_TEETH, TOOTH_STATUS } = require('../lib/teeth');
 const { DateTime, TZ } = require('../lib/time');
 const { buildPlanPdf } = require('../services/planPdf');
+const { applyTreatmentMaterials, reverseTreatmentMaterials } = require('../services/stock');
 
 router.use((req, res, next) => (canPlans(req.user) ? next() : next(new HttpError(403, 'Piani di cura riservati a odontoiatri, segreteria e amministratori'))));
 
@@ -237,6 +238,7 @@ router.post('/:id/items/:itemId/done', ah(async (req, res) => {
       },
     });
     await tx.treatmentPlanItem.update({ where: { id: item.id }, data: { status: 'ESEGUITO', treatmentId: t.id, doneAt: new Date() } });
+    await applyTreatmentMaterials(tx, t, req.user.id);
     if (item.tooth && body.toothStatus) {
       const where = { patientId_tooth: { patientId: plan.patientId, tooth: item.tooth } };
       const cur = await tx.dentalTooth.findUnique({ where });
@@ -266,7 +268,10 @@ router.post('/:id/items/:itemId/undo', ah(async (req, res) => {
       where: { id: item.id },
       data: { status: item.appointmentId ? 'PROGRAMMATO' : 'DA_FARE', treatmentId: null, doneAt: null },
     });
-    if (item.treatmentId) await tx.dentalTreatment.deleteMany({ where: { id: item.treatmentId } });
+    if (item.treatmentId) {
+      await reverseTreatmentMaterials(tx, item.treatmentId);
+      await tx.dentalTreatment.deleteMany({ where: { id: item.treatmentId } });
+    }
     if (plan.status === 'COMPLETATO') await tx.treatmentPlan.update({ where: { id: plan.id }, data: { status: 'ACCETTATO' } });
   });
   res.json(withTotals(await loadPlan(plan.id)));

@@ -8,6 +8,7 @@ const prisma = require('../lib/prisma');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { canDental, isAdmin } = require('../middleware/auth');
 const { ALL_TEETH, TOOTH_STATUS, SURFACES, SURFACE_STATUS } = require('../lib/teeth');
+const { applyTreatmentMaterials, reverseTreatmentMaterials } = require('../services/stock');
 
 router.use((req, res, next) => (canDental(req.user) ? next() : next(new HttpError(403, 'Cartella dentale riservata a odontoiatri e amministratori'))));
 
@@ -132,6 +133,7 @@ router.post('/patients/:id/treatments', ah(async (req, res) => {
     });
     await applyToothStatus(tx, patientId, { ...data, toothStatus }, req.user.id);
     await enable(tx, patientId);
+    await applyTreatmentMaterials(tx, created, req.user.id);
     return created;
   });
   res.status(201).json(t);
@@ -156,6 +158,11 @@ router.put('/patients/:id/treatments/:tid', ah(async (req, res) => {
       include: treatmentInclude,
     });
     await applyToothStatus(tx, current.patientId, { ...data, toothStatus }, req.user.id);
+    // prestazione, dente o paziente cambiati: si rifà lo scarico automatico dei materiali
+    if (current.serviceId !== updated.serviceId || current.tooth !== updated.tooth) {
+      await reverseTreatmentMaterials(tx, current.id);
+      await applyTreatmentMaterials(tx, updated, req.user.id);
+    }
     return updated;
   });
   res.json(t);
@@ -163,7 +170,10 @@ router.put('/patients/:id/treatments/:tid', ah(async (req, res) => {
 
 router.delete('/patients/:id/treatments/:tid', ah(async (req, res) => {
   const t = await ownTreatment(req);
-  await prisma.dentalTreatment.delete({ where: { id: t.id } });
+  await prisma.$transaction(async (tx) => {
+    await reverseTreatmentMaterials(tx, t.id);
+    await tx.dentalTreatment.delete({ where: { id: t.id } });
+  });
   res.status(204).end();
 }));
 

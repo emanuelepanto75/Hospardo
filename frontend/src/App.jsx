@@ -16,6 +16,8 @@ import Requests from './pages/Requests';
 import EmergencyDevices from './pages/EmergencyDevices';
 import Book from './pages/Book';
 import Plans from './pages/Plans';
+import Stock from './pages/Stock';
+import StockItem from './pages/StockItem';
 import ManageAppointment from './pages/ManageAppointment';
 
 function Private() {
@@ -36,6 +38,8 @@ function Private() {
         <Route path="/medici/:id" element={<DoctorDetail />} />
         <Route path="/prestazioni" element={<Services />} />
         {user.plans && <Route path="/piani" element={<Plans />} />}
+        {user.plans && <Route path="/magazzino" element={<Stock />} />}
+        {user.plans && <Route path="/magazzino/articoli/:id" element={<StockItem />} />}
         {isAdmin(user) && <Route path="/utenti" element={<Users />} />}
         {isAdmin(user) && <Route path="/postazioni" element={<EmergencyDevices />} />}
         <Route path="*" element={<Navigate to="/agenda" replace />} />

@@ -361,6 +361,35 @@ export default function DentalChart({ patientId, user, onEnabledChange }) {
           </table>
         </div>
       )}
+      <PatientImplants patientId={patientId} />
     </section>
+  );
+}
+
+/** Impianti applicati al paziente (dal magazzino): articolo, lotto, scadenza, dente */
+function PatientImplants({ patientId }) {
+  const { data } = useApi('/stock/implants', { patientId });
+  if (!data || !data.length) return null;
+  return (
+    <>
+      <h3>Impianti applicati</h3>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Data</th><th>Dente</th><th>Impianto</th><th>Lotto</th><th>Scadenza</th><th>Seriale</th></tr></thead>
+          <tbody>
+            {data.map((m) => (
+              <tr key={m.id}>
+                <td className="nowrap">{fmtDate(m.treatment?.date || m.createdAt)}</td>
+                <td>{m.tooth || '—'}</td>
+                <td>{m.item.name}</td>
+                <td className="mono">{m.lot?.lot || '—'}</td>
+                <td>{m.lot?.expiry ? DateTime.fromISO(m.lot.expiry, { zone: 'utc' }).toFormat('dd/LL/yyyy') : ''}</td>
+                <td className="mono">{m.serial}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

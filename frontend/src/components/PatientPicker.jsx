@@ -4,7 +4,7 @@ import { patientName } from '../lib/constants';
 import PatientForm from './PatientForm';
 
 /** Ricerca paziente con possibilità di crearne uno nuovo al volo */
-export default function PatientPicker({ value, onChange }) {
+export default function PatientPicker({ value, onChange, autoFocus = true }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [creating, setCreating] = useState(false);
@@ -42,7 +42,7 @@ export default function PatientPicker({ value, onChange }) {
 
   return (
     <div className="autocomplete">
-      <input autoFocus placeholder="Cerca per cognome, nome, telefono o codice fiscale…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input autoFocus={autoFocus} placeholder="Cerca per cognome, nome, telefono o codice fiscale…" value={q} onChange={(e) => setQ(e.target.value)} />
       {(results.length > 0 || q.trim().length >= 2) && (
         <ul className="ac-list">
           {results.map((p) => (

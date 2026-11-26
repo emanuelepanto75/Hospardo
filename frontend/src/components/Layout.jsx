@@ -19,12 +19,23 @@ export default function Layout() {
     return () => { clearInterval(t); window.removeEventListener('hospardo:requests', load); };
   }, [canHandleRequests]);
 
+  // articoli sottoscorta + lotti in scadenza
+  const [stockAlerts, setStockAlerts] = useState(0);
+  useEffect(() => {
+    if (!user.plans) return undefined;
+    const load = () => api('/stock/summary').then((r) => setStockAlerts(r.lowStock + r.expiring)).catch(() => {});
+    load();
+    const t = setInterval(load, 5 * 60000);
+    window.addEventListener('hospardo:stock', load);
+    return () => { clearInterval(t); window.removeEventListener('hospardo:stock', load); };
+  }, [user.plans]);
+
   const links = [
     { to: '/agenda', label: 'Agenda', icon: '📅' },
     ...(canHandleRequests ? [{ to: '/richieste', label: 'Richieste', icon: '📥', badge: pending }] : []),
     { to: '/promemoria', label: 'Promemoria', icon: '💬' },
     { to: '/pazienti', label: 'Pazienti', icon: '👤' },
-    ...(user.plans ? [{ to: '/piani', label: 'Piani di cura', icon: '🦷' }] : []),
+    ...(user.plans ? [{ to: '/piani', label: 'Piani di cura', icon: '🦷' }, { to: '/magazzino', label: 'Magazzino', icon: '📦', badge: stockAlerts, warn: true }] : []),
     { to: '/medici', label: 'Medici e orari', icon: '🩺' },
     { to: '/prestazioni', label: 'Prestazioni', icon: '📋' },
     ...(isAdmin(user) ? [{ to: '/utenti', label: 'Utenti', icon: '🔑' }, { to: '/postazioni', label: 'Postazioni di emergenza', icon: '🛟' }] : []),
@@ -37,7 +48,7 @@ export default function Layout() {
           {links.map((l) => (
             <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? 'active' : '')}>
               <span aria-hidden>{l.icon}</span> {l.label}
-              {l.badge > 0 && <span className="nav-badge">{l.badge}</span>}
+              {l.badge > 0 && <span className={`nav-badge ${l.warn ? 'nav-badge-warn' : ''}`}>{l.badge}</span>}
             </NavLink>
           ))}
           <a href={`${siteHome()}prenota`} target="_blank" rel="noreferrer"><span aria-hidden>🌐</span> Pagina prenotazioni</a>

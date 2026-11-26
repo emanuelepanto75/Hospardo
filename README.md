@@ -27,6 +27,11 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   dentista, sconto, validità, **preventivo PDF** numerato con firma di accettazione; stati proposto / accettato /
   completato / rifiutato; **prenotazione delle sedute** direttamente dalle voci del piano; "eseguito" (solo
   odontoiatri) registra il trattamento nel diario. Pagina **Piani di cura** con tutti i preventivi da seguire
+- **Magazzino odontoiatrico** con **lettore di codici a barre** (USB o Bluetooth in modalità tastiera): articoli con
+  scorta minima e avviso sottoscorta, carichi (fornitore, DDT, costo), scarichi, rettifiche d'inventario, lotti e
+  scadenze, codici EAN e **GS1** (dai codici di impianti e dispositivi si leggono anche lotto e scadenza),
+  **tracciabilità degli impianti** su paziente e dente con ricerca per lotto, **scarico automatico** dei materiali
+  previsti per ogni prestazione quando il trattamento è registrato nel diario
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**

@@ -120,6 +120,7 @@ model Service {
   requests       BookingRequest[]
   dentalTreatments DentalTreatment[]
   planItems      TreatmentPlanItem[]
+  materials      ServiceMaterial[]
 
   @@map("services")
 }
@@ -189,6 +190,7 @@ model Patient {
   dentalTeeth    DentalTooth[]
   dentalTreatments DentalTreatment[]
   treatmentPlans TreatmentPlan[]
+  stockMovements StockMovement[]
 
   @@index([lastName, firstName])
   @@map("patients")
@@ -331,6 +333,7 @@ model DentalTreatment {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   planItem      TreatmentPlanItem?
+  stockMovements StockMovement[]
 
   @@index([patientId, date])
   @@map("dental_treatments")
@@ -401,4 +404,116 @@ model TreatmentPlanItem {
 
   @@index([planId])
   @@map("treatment_plan_items")
+}
+
+enum StockMovementType {
+  CARICO
+  SCARICO
+  RETTIFICA
+}
+
+/// Articolo del magazzino odontoiatrico
+model StockItem {
+  id                 Int       @id @default(autoincrement())
+  name               String
+  /// codice interno (facoltativo)
+  code               String?   @unique
+  category           String?
+  supplier           String?
+  /// unità di misura: pz, conf, ml, g...
+  unit               String    @default("pz")
+  purchasePriceCents Int?      @map("purchase_price_cents")
+  /// sotto questa quantità l'articolo è "sottoscorta"
+  minStock           Float     @default(0) @map("min_stock")
+  /// giacenza attuale (somma dei movimenti)
+  quantity           Float     @default(0)
+  /// gestione per lotti e scadenze
+  trackLots          Boolean   @default(false) @map("track_lots")
+  /// impianto / dispositivo da tracciare sul paziente
+  isImplant          Boolean   @default(false) @map("is_implant")
+  active             Boolean   @default(true)
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  barcodes           StockBarcode[]
+  lots               StockLot[]
+  movements          StockMovement[]
+  serviceMaterials   ServiceMaterial[]
+
+  @@index([name])
+  @@map("stock_items")
+}
+
+/// Codici a barre dell'articolo (EAN / GTIN): un articolo può averne più di uno (es. confezione e singolo pezzo)
+model StockBarcode {
+  id       Int       @id @default(autoincrement())
+  itemId   Int       @map("item_id")
+  item     StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  /// codice normalizzato (GTIN a 14 cifre quando numerico)
+  code     String    @unique
+  /// pezzi caricati con una lettura (es. scatola da 10)
+  packQty  Float     @default(1) @map("pack_qty")
+
+  @@map("stock_barcodes")
+}
+
+model StockLot {
+  id        Int       @id @default(autoincrement())
+  itemId    Int       @map("item_id")
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  lot       String
+  expiry    DateTime? @db.Date
+  quantity  Float     @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  movements StockMovement[]
+
+  @@unique([itemId, lot])
+  @@index([expiry])
+  @@map("stock_lots")
+}
+
+/// Movimento di magazzino. quantity con segno: + entra, - esce
+model StockMovement {
+  id            Int               @id @default(autoincrement())
+  itemId        Int               @map("item_id")
+  item          StockItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  lotId         Int?              @map("lot_id")
+  lot           StockLot?         @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  type          StockMovementType
+  quantity      Float
+  unitCostCents Int?              @map("unit_cost_cents")
+  supplier      String?
+  /// documento di trasporto / fattura
+  document      String?
+  /// tracciabilità: paziente e dente (impianti)
+  patientId     Int?              @map("patient_id")
+  patient       Patient?          @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  tooth         Int?
+  /// scarico automatico da un trattamento del diario
+  treatmentId   Int?              @map("treatment_id")
+  treatment     DentalTreatment?  @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  auto          Boolean           @default(false)
+  serial        String?
+  note          String?
+  createdById   Int?              @map("created_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@index([itemId, createdAt])
+  @@index([patientId])
+  @@index([treatmentId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+/// Materiali consumati da una prestazione: scaricati in automatico quando il trattamento è registrato
+model ServiceMaterial {
+  serviceId Int       @map("service_id")
+  service   Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  itemId    Int       @map("item_id")
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity  Float
+
+  @@id([serviceId, itemId])
+  @@map("service_materials")
 }

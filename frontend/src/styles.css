@@ -342,3 +342,30 @@ input.w-price { width: 90px; }
 .plan-sum label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px; }
 .big-inline { font-size: 1.15rem; }
 .done-form { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+
+/* Magazzino */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.tabs button { border: 0; background: none; padding: 9px 14px; cursor: pointer; font: inherit; font-size: .92rem; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.scan-input { display: flex; align-items: center; gap: 10px; border: 2px dashed var(--primary); border-radius: 8px; padding: 6px 12px; background: var(--primary-soft, #ecfeff); }
+.scan-input span { color: var(--primary); letter-spacing: -2px; font-size: 1.1rem; }
+.scan-input input { border: 0; background: transparent; outline: none; font-size: 1rem; padding: 6px 0; flex: 1; box-shadow: none; }
+.ac { position: relative; }
+.ac .ac-list { position: absolute; left: 0; right: 0; z-index: 20; }
+.ac-item b { font-weight: 600; }
+.unknown-code { border-left: 4px solid #d97706; }
+.move-rows td { vertical-align: middle; padding: 6px 8px; }
+.move-rows input.w-lot { width: 120px; }
+.move-rows input.w-tooth { width: 54px; }
+.move-rows input.w-qty, input.w-qty { width: 70px; }
+.move-rows select { max-width: 240px; }
+.exp-past { color: #dc2626; font-weight: 700; }
+.exp-soon { color: #b45309; font-weight: 600; }
+td.neg { color: #b91c1c; font-weight: 600; }
+td.pos { color: #15803d; font-weight: 600; }
+.stock-qty { text-align: right; }
+.stock-qty .big { font-size: 1.8rem; font-weight: 700; }
+.stock-qty small { font-size: .9rem; color: var(--muted); font-weight: 400; }
+.grid2.align-start { align-items: start; }
+label.inline { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; }
+.nav-badge-warn { background: #d97706 !important; }
