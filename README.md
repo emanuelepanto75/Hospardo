@@ -63,6 +63,13 @@ Lo stesso Excel si scarica dall'agenda con il pulsante **Excel 6 giorni**.
 consultabile anche senza internet (sola lettura). Postazioni autorizzate con chiave revocabile:
 [docs/EMERGENZA.md](docs/EMERGENZA.md).
 
+## Versioni
+
+La versione in uso compare in basso nel menu, nella pagina di accesso e nella pagina **Novità** (`/novita`),
+che elenca cosa contiene ogni versione. L'elenco sta in `backend/src/releases.json`: a ogni rilascio si aggiunge
+in cima una voce con numero, data e novità. Se dopo un aggiornamento qualcuno ha ancora la pagina vecchia aperta,
+l'agenda glielo segnala e propone di ricaricarla.
+
 ## Aggiornare un'installazione esistente
 
 Con Docker bastano `git pull` e `docker compose up -d --build`. Senza Docker:

@@ -415,3 +415,9 @@ label.inline { display: inline-flex !important; flex-direction: row !important; 
 }
 .swatch-exception { display: inline-block; width: 14px; height: 10px; vertical-align: middle; margin-right: 3px; background: #f0fdf4; border: 1px solid #bbf7d0; box-shadow: inset 3px 0 0 #22c55e; }
 .wa-mode { margin: -4px 0 12px; gap: 8px; }
+.version-link { color: #7f9aa5 !important; font-size: .75rem; text-decoration: none !important; margin-top: 2px; }
+.version-link:hover { color: #c5d7de !important; }
+.sidebar.collapsed .version-link { text-align: center; }
+.update-notice { background: #fef3c7; border-bottom: 1px solid #fcd34d; padding: 8px 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: .92rem; }
+.release.current { border-left: 4px solid #16a34a; }
+.release ul { margin: 8px 0 0; padding-left: 20px; }

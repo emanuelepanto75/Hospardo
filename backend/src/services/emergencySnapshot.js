@@ -4,6 +4,7 @@
  */
 const prisma = require('../lib/prisma');
 const config = require('../lib/config');
+const appVersion = require('../lib/version');
 const { DateTime, TZ, dayBounds } = require('../lib/time');
 
 const DAYS = 7; // oggi + i giorni successivi, domenica esclusa
@@ -80,7 +81,7 @@ async function buildSnapshotHtml(now = new Date()) {
 
   return `<!doctype html>
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="hospardo-snapshot" content="${esc(generated.toISO())}">
+<meta name="hospardo-snapshot" content="${esc(generated.toISO())}"><meta name="hospardo-version" content="${esc(appVersion.version)}">
 <title>Agenda di emergenza – ${esc(config.clinic.name)}</title>
 <style>
   *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1f2937;background:#f4f6f9;font-size:14px}

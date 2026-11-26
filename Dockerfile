@@ -6,6 +6,8 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+# elenco dei rilasci: la versione mostrata nell'interfaccia
+COPY backend/src/releases.json /app/backend/src/releases.json
 RUN npm run build
 
 # --- 2. Backend con le sole dipendenze di produzione ---

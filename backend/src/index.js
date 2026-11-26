@@ -32,6 +32,10 @@ app.use(cors({ origin: config.frontendUrl }));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+// versione in uso (pubblica: serve anche per avvisare chi ha la pagina vecchia aperta)
+const appVersion = require('./lib/version');
+app.get('/api/version', (req, res) => res.set('Cache-Control', 'no-store').json({ version: appVersion.version, date: appVersion.date }));
+app.get('/api/releases', (req, res) => res.json(appVersion.releases));
 app.use('/api/auth', require('./routes/auth').router);
 app.use('/api/public', require('./routes/public'));
 // copia di emergenza scaricata dai PC dello studio con la loro chiave (prima del login)
@@ -64,6 +68,7 @@ app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(config.port, () => {
+    console.log(`Hospardo versione ${appVersion.version} del ${appVersion.date}`);
     console.log(`Hospardo in ascolto su http://localhost:${config.port}`);
     console.log(require('./services/mailer').describeConfig());
     if (config.isPublic) console.log(`Indirizzo pubblico configurato: ${config.frontendUrl}`);

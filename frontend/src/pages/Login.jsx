@@ -1,3 +1,4 @@
+import { versionLabel } from '../lib/version';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { errorMessage } from '../lib/api';
@@ -26,6 +27,7 @@ export default function Login() {
         {err && <div className="alert">{err}</div>}
         <button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Accesso…' : 'Accedi'}</button>
         <a className="small" href="/prenota">Sei un paziente? Prenota online →</a>
+        <p className="muted small" style={{ textAlign: 'center', margin: 0 }}>{versionLabel()}</p>
       </form>
     </div>
   );

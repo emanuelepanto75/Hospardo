@@ -4,6 +4,8 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { siteHome } from '../pages/Book';
 import { ROLES, isAdmin } from '../lib/constants';
+import { APP_VERSION, versionLabel } from '../lib/version';
+import UpdateNotice from './UpdateNotice';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -64,9 +66,10 @@ export default function Layout() {
           <div className="nav-label"><b>{user.name}</b></div>
           <div className="muted small nav-label">{ROLES[user.role]}</div>
           <button className="btn btn-ghost btn-sm" onClick={logout} title="Esci">{collapsed ? '⏻' : 'Esci'}</button>
+          <NavLink to="/novita" className="version-link" title={`${versionLabel()} – novità`}>{collapsed ? `v${APP_VERSION}` : versionLabel()}</NavLink>
         </div>
       </aside>
-      <main className="content"><Outlet /></main>
+      <main className="content"><UpdateNotice /><Outlet /></main>
     </div>
   );
 }
