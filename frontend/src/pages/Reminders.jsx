@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { api, errorMessage } from '../lib/api';
+import { api, download, errorMessage } from '../lib/api';
 import { DateTime, fmtTime } from '../lib/time';
 import { doctorName, NOTIFICATION_STATUS } from '../lib/constants';
 import WhatsAppButton from '../components/WhatsAppButton';
@@ -150,7 +150,13 @@ function DoctorReminders({ onTab }) {
       load();
     } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); load(); } finally { setBusy(null); }
   }
-  const logWhatsapp = (r) => api(`/doctor-reminders/${r.doctor.id}/whatsapp`, { method: 'POST', body: { date: r.date } }).then(load).catch(() => {});
+  const pdf = (r) => download(`/doctor-reminders/${r.doctor.id}/${r.date}/pdf`, `appuntamenti-${r.date}.pdf`).catch((e) => setMsg({ ok: false, text: errorMessage(e) }));
+  // WhatsApp non permette di allegare file da un link: si scarica il PDF e lo si trascina nella chat
+  const logWhatsapp = (r) => {
+    pdf(r);
+    setMsg({ ok: true, text: `PDF scaricato: trascinalo nella chat WhatsApp di ${doctorName(r.doctor)} (o usa la graffetta → Documento) prima di inviare.` });
+    api(`/doctor-reminders/${r.doctor.id}/whatsapp`, { method: 'POST', body: { date: r.date } }).then(load).catch(() => {});
+  };
 
   const withAppts = data?.rows.filter((r) => r.date) || [];
   const without = data?.rows.filter((r) => !r.date) || [];
@@ -173,7 +179,7 @@ function DoctorReminders({ onTab }) {
       {!data ? <p className="muted">Caricamento…</p> : withAppts.length === 0 ? <div className="empty">Nessun medico ha appuntamenti nei prossimi 60 giorni.</div> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Medico</th><th>Prima data utile</th><th>Appuntamenti</th><th>Email</th><th>WhatsApp</th></tr></thead>
+            <thead><tr><th>Medico</th><th>Prima data utile</th><th>Appuntamenti</th><th>PDF</th><th>Email (con PDF)</th><th>WhatsApp (+ PDF)</th></tr></thead>
             <tbody>
               {withAppts.map((r) => (
                 <Fragment key={r.doctor.id}>
@@ -181,6 +187,7 @@ function DoctorReminders({ onTab }) {
                     <td><span className="dot" style={{ background: r.doctor.color }} /> <b>{doctorName(r.doctor)}</b><div className="muted small">{r.doctor.specialty}</div></td>
                     <td><b>{day(r.date)}</b><div className="muted small">dalle {r.first} alle {r.last}</div></td>
                     <td><button className="link" onClick={() => toggle(r)}>{r.count} {r.count === 1 ? 'appuntamento' : 'appuntamenti'} {open[r.doctor.id] ? '▾' : '▸'}</button></td>
+                    <td><button className="btn btn-sm" onClick={() => pdf(r)} title="Scarica il PDF della giornata">PDF</button></td>
                     <td>
                       {r.doctor.email
                         ? <button className="btn btn-sm" disabled={busy === r.doctor.id} onClick={() => email(r)}>{r.emailSent ? 'Reinvia email' : 'Invia email'}</button>
@@ -196,7 +203,7 @@ function DoctorReminders({ onTab }) {
                     </td>
                   </tr>
                   {open[r.doctor.id] && (
-                    <tr><td colSpan={5} className="subrow">
+                    <tr><td colSpan={6} className="subrow">
                       <table className="table compact"><tbody>
                         {open[r.doctor.id].map((a) => <tr key={a.id}><td className="nowrap"><b>{a.time}</b>–{a.end}</td><td>{a.patient}</td><td>{a.service}</td><td className="muted small">{a.notes}</td></tr>)}
                       </tbody></table>
@@ -209,7 +216,7 @@ function DoctorReminders({ onTab }) {
         </div>
       )}
       {without.length > 0 && <p className="muted small">Senza appuntamenti nei prossimi 60 giorni: {without.map((r) => doctorName(r.doctor)).join(', ')}.</p>}
-      <p className="muted small">Su WhatsApp, per riservatezza, i pazienti sono indicati con cognome e iniziale del nome; nell'email con nome completo e note. L'email e il cellulare del medico si inseriscono nella sua scheda.</p>
+      <p className="muted small">Il PDF è la stampa della giornata del medico (appuntamenti, telefoni, note, orari liberi). L'email lo contiene in allegato. Con WhatsApp il PDF viene scaricato e va trascinato nella chat: nel testo del messaggio, per riservatezza, i pazienti sono indicati con cognome e iniziale. Email e cellulare del medico si inseriscono nella sua scheda.</p>
     </div>
   );
 }

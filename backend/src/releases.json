@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.13.1",
+    "date": "2026-11-26",
+    "title": "PDF nel promemoria ai medici",
+    "items": [
+      "Promemoria ai medici con il PDF della giornata: allegato all'email, scaricabile e da trascinare nella chat WhatsApp"
+    ]
+  },
+  {
     "version": "1.13.0",
     "date": "2026-11-26",
     "title": "Promemoria ai medici e ricerca del medico",

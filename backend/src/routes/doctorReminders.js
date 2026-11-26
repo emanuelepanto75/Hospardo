@@ -11,6 +11,14 @@ const { requireRole } = require('../middleware/auth');
 const { DateTime, TZ, dayBounds } = require('../lib/time');
 const { normalizePhone } = require('../lib/phone');
 const { sendMail, emailEnabled } = require('../services/mailer');
+const { buildDoctorWeek, buildDoctorWeekPdf } = require('../services/doctorWeek');
+
+const slugify = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/** PDF della giornata del medico (la stessa della stampa Giorno) */
+async function dayPdf(doctor, iso) {
+  const day = await buildDoctorWeek(doctor.id, iso, 'day');
+  return { filename: `appuntamenti-${slugify(docName(doctor))}-${iso}.pdf`, content: await buildDoctorWeekPdf(day), contentType: 'application/pdf' };
+}
 
 router.use(requireRole('ADMIN', 'SEGRETERIA'));
 
@@ -39,7 +47,7 @@ function whatsappText(doctor, iso, appts) {
   return [
     `Buongiorno ${docName(doctor)}, le ricordiamo gli appuntamenti di ${dayLabel(iso)} presso ${config.clinic.name}:`,
     ...lines,
-    `Totale: ${appts.length}. Per variazioni contatti la segreteria.`,
+    `Totale: ${appts.length}. In allegato il PDF con il dettaglio. Per variazioni contatti la segreteria.`,
   ].join('\n');
 }
 
@@ -92,6 +100,16 @@ router.get('/:doctorId/:date', ah(async (req, res) => {
   res.json(list.map((a) => ({ id: a.id, time: hm(a.start), end: hm(a.end), patient: `${a.patient.lastName} ${a.patient.firstName}`, phone: a.patient.phone, service: a.service?.name || '', notes: a.notes })));
 }));
 
+/** PDF della giornata, da allegare su WhatsApp o da stampare */
+router.get('/:doctorId/:date/pdf', ah(async (req, res) => {
+  const doctor = await prisma.doctor.findUnique({ where: { id: Number(req.params.doctorId) } });
+  if (!doctor) throw notFound('Medico');
+  const pdf = await dayPdf(doctor, isoDay.parse(req.params.date));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${pdf.filename}"`);
+  res.send(pdf.content);
+}));
+
 router.post('/:doctorId/email', ah(async (req, res) => {
   const doctor = await prisma.doctor.findUnique({ where: { id: Number(req.params.doctorId) } });
   if (!doctor) throw notFound('Medico');
@@ -103,16 +121,17 @@ router.post('/:doctorId/email', ah(async (req, res) => {
   const text = [
     `Buongiorno ${docName(doctor)},`, '', `ecco gli appuntamenti di ${dayLabel(iso)} presso ${config.clinic.name}:`, '',
     ...list.map((a) => `${hm(a.start)}-${hm(a.end)}  ${a.patient.lastName} ${a.patient.firstName}${a.service ? ` – ${a.service.name}` : ''}${a.notes ? ` (${a.notes})` : ''}`),
-    '', `Totale: ${list.length}.`, 'Per variazioni contatti la segreteria.', '', config.clinic.name,
+    '', `Totale: ${list.length}. In allegato il PDF con il dettaglio della giornata.`, 'Per variazioni contatti la segreteria.', '', config.clinic.name,
   ].join('\n');
   const html = `<p>Buongiorno ${esc(docName(doctor))},</p><p>ecco gli appuntamenti di <b>${esc(dayLabel(iso))}</b> presso ${esc(config.clinic.name)}:</p>
     <table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">
     <tr style="background:#e0f2f7"><th align="left">Ora</th><th align="left">Paziente</th><th align="left">Prestazione</th><th align="left">Note</th></tr>
     ${list.map((a) => `<tr style="border-bottom:1px solid #e5e7eb"><td><b>${hm(a.start)}</b>–${hm(a.end)}</td><td>${esc(a.patient.lastName)} ${esc(a.patient.firstName)}</td><td>${esc(a.service?.name || '')}</td><td>${esc(a.notes || '')}</td></tr>`).join('')}
-    </table><p>Totale: <b>${list.length}</b>. Per variazioni contatti la segreteria.</p><p style="color:#6b7280">${esc(config.clinic.name)}</p>`;
+    </table><p>Totale: <b>${list.length}</b>. In allegato il PDF con il dettaglio della giornata. Per variazioni contatti la segreteria.</p><p style="color:#6b7280">${esc(config.clinic.name)}</p>`;
   const base = { doctorId: doctor.id, date: dateOnly(iso), channel: 'EMAIL', recipient: doctor.email, count: list.length, sentById: req.user.id };
   try {
-    const r = await sendMail({ to: doctor.email, subject: `${title} – ${config.clinic.name}`, text, html });
+    const pdf = await dayPdf(doctor, iso);
+    const r = await sendMail({ to: doctor.email, subject: `${title} – ${config.clinic.name}`, text, html, attachments: [pdf] });
     const rec = await prisma.doctorReminder.create({ data: { ...base, status: r.status } });
     res.json(rec);
   } catch (e) {
