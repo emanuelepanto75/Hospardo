@@ -34,6 +34,7 @@ export default function DoctorDetail() {
       {!isNew && <>
         <DoctorServices key={`s${doctor.id}-${doctor.services.length}`} doctor={doctor} services={services || []} readOnly={!isAdmin} onSaved={reload} />
         <HoursEditor key={`h${doctor.id}`} doctor={doctor} readOnly={!canManage} onSaved={reload} />
+        <ExceptionsEditor doctor={doctor} readOnly={!canManage} onSaved={reload} />
         <TimeOffEditor doctorId={doctor.id} readOnly={!canManage} />
         {isAdmin && <DoctorStatus doctor={doctor} onChanged={reload} onDeleted={() => nav('/medici', { replace: true })} />}
       </>}
@@ -144,6 +145,111 @@ function HoursEditor({ doctor, readOnly, onSaved }) {
       </div>
       {msg && <div className={msg.ok ? 'notice' : 'alert'}>{msg.text}</div>}
       {!readOnly && <div className="row-end"><button className="btn btn-primary" onClick={save}>Salva orari</button></div>}
+    </div>
+  );
+}
+
+/**
+ * Eccezioni: giorni in cui il medico lavora con orari diversi da quelli settimanali
+ * (es. una settimana con orario ridotto o un sabato in più). Sostituiscono l'orario abituale di quei giorni.
+ */
+function ExceptionsEditor({ doctor, readOnly, onSaved }) {
+  const [items, setItems] = useState(null);
+  const today = DateTime.now().toISODate();
+  const weeklyFor = (iso) => {
+    const wd = DateTime.fromISO(iso).weekday;
+    const h = doctor.workingHours.filter((x) => x.weekday === wd).map(({ startTime, endTime }) => ({ startTime, endTime }));
+    return h.length ? h : [{ startTime: '09:00', endTime: '13:00' }];
+  };
+  const [f, setF] = useState(() => ({ from: today, to: today, days: [1, 2, 3, 4, 5, 6], blocks: weeklyFor(today), note: '' }));
+  const [msg, setMsg] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const load = () => api(`/doctors/${doctor.id}/exceptions`).then(setItems);
+  useEffect(() => { load(); }, [doctor.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const byDate = (items || []).reduce((m, e) => { (m[e.date.slice(0, 10)] ||= []).push(e); return m; }, {});
+  const dates = [];
+  for (let d = DateTime.fromISO(f.from); f.to && d <= DateTime.fromISO(f.to) && dates.length < 62; d = d.plus({ days: 1 })) {
+    if (f.from === f.to || f.days.includes(d.weekday)) dates.push(d.toISODate());
+  }
+  const setBlock = (i, k, v) => setF({ ...f, blocks: f.blocks.map((b, j) => (j === i ? { ...b, [k]: v } : b)) });
+
+  async function save(e) {
+    e.preventDefault();
+    setMsg(null);
+    if (!dates.length) { setMsg({ ok: false, text: 'Nessun giorno selezionato' }); return; }
+    setSaving(true);
+    let outside = 0;
+    try {
+      for (const d of dates) {
+        const r = await api(`/doctors/${doctor.id}/exceptions/${d}`, { method: 'PUT', body: { blocks: f.blocks, note: f.note || null } });
+        outside += r.outsideAppointments;
+      }
+      setMsg(outside
+        ? { ok: false, text: `Orario salvato per ${dates.length} giorni. Attenzione: ${outside} appuntamenti restano fuori dal nuovo orario.` }
+        : { ok: true, text: `Orario salvato per ${dates.length} ${dates.length === 1 ? 'giorno' : 'giorni'}` });
+      load(); onSaved?.();
+    } catch (e2) { setMsg({ ok: false, text: errorMessage(e2) }); } finally { setSaving(false); }
+  }
+  async function remove(date) {
+    if (!window.confirm(`Togliere l'eccezione del ${DateTime.fromISO(date).toFormat('d LLLL')}? Torna valido l'orario settimanale.`)) return;
+    await api(`/doctors/${doctor.id}/exceptions/${date}`, { method: 'DELETE' });
+    load(); onSaved?.();
+  }
+
+  return (
+    <div className="card form">
+      <h2>Eccezioni all'orario</h2>
+      <p className="muted small" style={{ marginTop: -8 }}>Giorni in cui il medico è disponibile con orari diversi da quelli settimanali (es. una settimana con orario diverso, un sabato in più). In quei giorni valgono solo le fasce indicate qui.</p>
+      {items && Object.keys(byDate).length === 0 && <p className="muted small">Nessuna eccezione.</p>}
+      {items && Object.keys(byDate).length > 0 && (
+        <table className="table">
+          <tbody>
+            {Object.entries(byDate).map(([d, rows]) => (
+              <tr key={d} className={d < today ? 'inactive' : ''}>
+                <td className="nowrap">{DateTime.fromISO(d).toFormat('cccc d LLLL yyyy')}</td>
+                <td>{rows.map((r) => `${r.startTime}–${r.endTime}`).join(', ')}</td>
+                <td className="muted small">{rows[0].note}</td>
+                <td className="right">{!readOnly && <button className="btn btn-ghost btn-sm" onClick={() => remove(d)}>Elimina</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {!readOnly && (
+        <form onSubmit={save} className="exception-form">
+          <div className="timeoff-form">
+            <label>Dal<input type="date" required value={f.from} onChange={(e) => setF({ ...f, from: e.target.value, to: f.to < e.target.value ? e.target.value : f.to, blocks: weeklyFor(e.target.value) })} /></label>
+            <label>Al<input type="date" required value={f.to} min={f.from} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
+            <label className="grow">Nota<input placeholder="es. orario ridotto, sostituzione collega" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
+          </div>
+          {f.from !== f.to && (
+            <div className="row small">
+              <span>Solo nei giorni:</span>
+              {WEEKDAYS.map((w, i) => (
+                <label key={w} className="check"><input type="checkbox" checked={f.days.includes(i + 1)}
+                  onChange={(e) => setF({ ...f, days: e.target.checked ? [...f.days, i + 1] : f.days.filter((x) => x !== i + 1) })} /> {w.slice(0, 3)}</label>
+              ))}
+            </div>
+          )}
+          <div className="row">
+            <span className="small">Fasce:</span>
+            {f.blocks.map((b, i) => (
+              <span key={i} className="block-edit">
+                <input type="time" required value={b.startTime} onChange={(e) => setBlock(i, 'startTime', e.target.value)} />–
+                <input type="time" required value={b.endTime} onChange={(e) => setBlock(i, 'endTime', e.target.value)} />
+                {f.blocks.length > 1 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setF({ ...f, blocks: f.blocks.filter((_, j) => j !== i) })}>✕</button>}
+              </span>
+            ))}
+            <button type="button" className="btn btn-sm" onClick={() => setF({ ...f, blocks: [...f.blocks, { startTime: '15:00', endTime: '19:00' }] })}>+ Fascia</button>
+          </div>
+          <div className="row-end">
+            <span className="muted small" style={{ marginRight: 'auto' }}>{dates.length} {dates.length === 1 ? 'giorno' : 'giorni'}{dates.some((d) => byDate[d]) ? ' (sostituisce le eccezioni già presenti)' : ''}</span>
+            <button className="btn" disabled={saving}>Salva eccezione</button>
+          </div>
+        </form>
+      )}
+      {msg && <div className={msg.ok ? 'notice' : 'alert'}>{msg.text}</div>}
     </div>
   );
 }

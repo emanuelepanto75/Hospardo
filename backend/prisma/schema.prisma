@@ -94,10 +94,12 @@ model Doctor {
   services      DoctorService[]
   workingHours  WorkingHours[]
   timeOff       TimeOff[]
+  scheduleExceptions ScheduleException[]
   appointments  Appointment[]
   requests      BookingRequest[]
   dentalTreatments DentalTreatment[]
   treatmentPlans TreatmentPlan[]
+  stockDrafts    StockUnloadDraft[]
 
   @@map("doctors")
 }
@@ -154,6 +156,20 @@ model WorkingHours {
   @@map("working_hours")
 }
 
+/// Eccezione all'orario settimanale: in quella data valgono queste fasce al posto di quelle abituali
+model ScheduleException {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int      @map("doctor_id")
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  startTime String   @map("start_time") // "HH:mm" ora locale
+  endTime   String   @map("end_time")
+  note      String?
+
+  @@index([doctorId, date])
+  @@map("schedule_exceptions")
+}
+
 /// Ferie, assenze, blocchi di agenda
 model TimeOff {
   id        Int      @id @default(autoincrement())
@@ -173,6 +189,8 @@ model Patient {
   lastName       String        @map("last_name")
   fiscalCode     String?       @unique @map("fiscal_code")
   birthDate      DateTime?     @map("birth_date") @db.Date
+  /// comune (o stato estero) di nascita, usato per calcolare il codice fiscale
+  birthPlace     String?       @map("birth_place")
   gender         String?
   email          String?
   phone          String?
@@ -191,6 +209,7 @@ model Patient {
   dentalTreatments DentalTreatment[]
   treatmentPlans TreatmentPlan[]
   stockMovements StockMovement[]
+  stockDrafts    StockUnloadDraft[]
 
   @@index([lastName, firstName])
   @@map("patients")
@@ -334,6 +353,7 @@ model DentalTreatment {
   updatedAt     DateTime     @updatedAt @map("updated_at")
   planItem      TreatmentPlanItem?
   stockMovements StockMovement[]
+  stockDrafts    StockUnloadDraft[]
 
   @@index([patientId, date])
   @@map("dental_treatments")
@@ -440,6 +460,7 @@ model StockItem {
   lots               StockLot[]
   movements          StockMovement[]
   serviceMaterials   ServiceMaterial[]
+  drafts             StockUnloadDraft[]
 
   @@index([name])
   @@map("stock_items")
@@ -516,4 +537,24 @@ model ServiceMaterial {
 
   @@id([serviceId, itemId])
   @@map("service_materials")
+}
+
+/// Materiale da scaricare proposto da un trattamento: diventa uno scarico solo quando il medico lo conferma
+model StockUnloadDraft {
+  id          Int              @id @default(autoincrement())
+  itemId      Int              @map("item_id")
+  item        StockItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity    Float
+  doctorId    Int              @map("doctor_id")
+  doctor      Doctor           @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientId   Int?             @map("patient_id")
+  patient     Patient?         @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  tooth       Int?
+  treatmentId Int?             @map("treatment_id")
+  treatment   DentalTreatment? @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([doctorId, date])
+  @@map("stock_unload_drafts")
 }

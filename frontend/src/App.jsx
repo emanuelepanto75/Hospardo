@@ -16,6 +16,7 @@ import Requests from './pages/Requests';
 import EmergencyDevices from './pages/EmergencyDevices';
 import Book from './pages/Book';
 import Plans from './pages/Plans';
+import Privacy from './pages/Privacy';
 import Stock from './pages/Stock';
 import StockItem from './pages/StockItem';
 import ManageAppointment from './pages/ManageAppointment';
@@ -52,6 +53,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/prenota" element={<Book />} />
+      <Route path="/privacy" element={<Privacy />} />
       <Route path="/appuntamento/:token" element={<ManageAppointment />} />
       <Route path="/*" element={<Private />} />
     </Routes>

@@ -32,6 +32,34 @@ Il pulsante apre `https://wa.me/<numero>` con il testo già scritto: basta preme
 È la funzione ufficiale "click to chat": nessun costo e nessun rischio di blocco del numero.
 Nello storico dell'appuntamento l'invio compare come "Aperto in WhatsApp dalla segreteria".
 
+## WhatsApp Business (consigliato)
+
+Conviene che lo studio usi **WhatsApp Business**, l'app gratuita di WhatsApp per le attività, con il numero
+dello studio. Con Hospardo funziona subito, senza configurazioni sul server.
+
+1. Sul telefono dello studio installa **WhatsApp Business** e registra il numero dello studio
+   (se il numero è già su WhatsApp normale, l'app propone di trasferire account e chat).
+2. Completa il **profilo dell'attività**: nome "Istituto Hospardo", indirizzo, orari, sito hospardo.it, email.
+   Utili anche il **messaggio di assenza** fuori orario e le **risposte rapide** per le domande frequenti.
+3. Sui PC della segreteria installa **WhatsApp** per Windows (dal Microsoft Store) e collegalo al telefono:
+   sul telefono WhatsApp Business → Dispositivi collegati → Collega un dispositivo, e inquadra il codice QR.
+   In alternativa usa WhatsApp Web (web.whatsapp.com) nel browser.
+4. In Hospardo, pagina **Promemoria**, scegli per ogni PC **Apri i messaggi con**:
+   - *App WhatsApp Business sul PC*: il pulsante verde apre direttamente l'app con il messaggio pronto;
+   - *WhatsApp Web nel browser*: apre la chat in una scheda di WhatsApp Web;
+   - *Chiedi ogni volta*: passa dalla pagina wa.me, che chiede dove aprire.
+
+I messaggi partono dal numero dello studio, gratis, e le risposte dei pazienti arrivano nella stessa app.
+
+### Più avanti: invii automatici con lo stesso numero
+
+Meta permette di collegare un numero già attivo sull'app WhatsApp Business anche alla piattaforma
+WhatsApp Business (Cloud API), continuando a usare l'app (funzione detta *coexistence*). Così i promemoria
+partirebbero da soli (opzione A più sotto) e la segreteria continuerebbe a rispondere dall'app.
+Gli invii automatici sono a pagamento per messaggio, quelli fatti dall'app restano gratuiti.
+Il collegamento si fa con la procedura guidata di Meta o di un fornitore (BSP) e può scollegare i dispositivi
+collegati, che vanno ricollegati: verificare le condizioni aggiornate al momento dell'attivazione.
+
 ## Orario del promemoria
 
 In `backend/.env`:
@@ -69,8 +97,8 @@ Ci sono due modi per averlo.
 
 1. Crea un account su [business.facebook.com](https://business.facebook.com) (Meta Business Suite).
 2. Su [developers.facebook.com](https://developers.facebook.com) crea un'app di tipo **Business** e aggiungi il prodotto **WhatsApp**.
-3. Collega un **numero di telefono** dello studio. Il numero non deve essere già usato con l'app WhatsApp
-   normale; puoi usare un numero nuovo o una linea fissa, che verrà verificata con una chiamata.
+3. Collega un **numero di telefono** dello studio: un numero nuovo o una linea fissa (verificata con una chiamata),
+   oppure il numero già usato con l'app WhatsApp Business scegliendo l'opzione di *coexistence* nella procedura.
 4. Crea un **token di accesso permanente**: Impostazioni business → Utenti di sistema → Genera token,
    con il permesso `whatsapp_business_messaging`.
 5. In **WhatsApp Manager → Modelli di messaggio** crea i modelli qui sotto, categoria **Utility**, lingua **Italiano**.

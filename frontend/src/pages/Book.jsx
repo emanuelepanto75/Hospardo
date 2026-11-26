@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { titleCase } from '../lib/names';
 import { api, errorMessage } from '../lib/api';
 import { DateTime, euro, fmtTime } from '../lib/time';
 import { doctorName, groupByCategory } from '../lib/constants';
@@ -202,8 +203,8 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
           <label>Giorni o orari preferiti<input value={f.preferences} onChange={set('preferences')} maxLength={300} placeholder="Es. martedì o giovedì pomeriggio, dopo le 17" /></label>
         )}
         <div className="grid2">
-          <label>Nome *<input required autoComplete="given-name" value={f.firstName} onChange={set('firstName')} /></label>
-          <label>Cognome *<input required autoComplete="family-name" value={f.lastName} onChange={set('lastName')} /></label>
+          <label>Nome *<input required autoComplete="given-name" value={f.firstName} onChange={set('firstName')} onBlur={() => setF((p) => ({ ...p, firstName: titleCase(p.firstName) }))} /></label>
+          <label>Cognome *<input required autoComplete="family-name" value={f.lastName} onChange={set('lastName')} onBlur={() => setF((p) => ({ ...p, lastName: titleCase(p.lastName) }))} /></label>
           <label>Email *<input required type="email" autoComplete="email" value={f.email} onChange={set('email')} /></label>
           <label>Telefono *<input required type="tel" autoComplete="tel" value={f.phone} onChange={set('phone')} /></label>
           <label>Codice fiscale<input maxLength={16} value={f.fiscalCode} onChange={set('fiscalCode')} style={{ textTransform: 'uppercase' }} /></label>
@@ -211,7 +212,7 @@ function BookingForm({ service, doctor, slot, onDone, onConflict }) {
         </div>
         <label>Note per lo studio<textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Facoltative" /></label>
         <label className="check"><input type="checkbox" checked={f.whatsappOptIn} onChange={set('whatsappOptIn')} /> Voglio ricevere conferma e promemoria anche su WhatsApp</label>
-        <label className="check"><input type="checkbox" required checked={f.privacyConsent} onChange={set('privacyConsent')} /> Acconsento al trattamento dei miei dati personali per la gestione della prenotazione *</label>
+        <label className="check"><input type="checkbox" required checked={f.privacyConsent} onChange={set('privacyConsent')} /> <span>Ho letto l'<a href="/privacy" target="_blank" rel="noreferrer">informativa privacy</a> e acconsento al trattamento dei miei dati, anche relativi alla salute, per la gestione della prenotazione *</span></label>
         {err && <div className="alert">{err}</div>}
         <button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Invio…' : 'Invia la richiesta'}</button>
         <p className="muted small" style={{ textAlign: 'center' }}>La prenotazione sarà valida solo dopo la conferma dello studio.</p>

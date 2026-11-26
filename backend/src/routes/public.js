@@ -2,6 +2,7 @@
  * API pubbliche per la prenotazione online da parte dei pazienti (nessun login).
  */
 const router = require('express').Router();
+const { titleCase } = require('../lib/names');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const config = require('../lib/config');
@@ -114,8 +115,8 @@ const requestSchema = z.object({
   // orario scelto tra quelli liberi (facoltativo) oppure preferenze libere
   start: z.preprocess(emptyToUndef, z.coerce.date().optional()),
   preferences: z.preprocess(emptyToUndef, z.string().trim().max(300).optional()),
-  firstName: z.string().trim().min(1, 'Nome obbligatorio').max(80),
-  lastName: z.string().trim().min(1, 'Cognome obbligatorio').max(80),
+  firstName: z.string().trim().min(1, 'Nome obbligatorio').max(80).transform(titleCase),
+  lastName: z.string().trim().min(1, 'Cognome obbligatorio').max(80).transform(titleCase),
   email: z.string().trim().email('Email non valida'),
   phone: z.string().trim().min(6, 'Telefono obbligatorio').max(30),
   fiscalCode: z.preprocess(emptyToUndef, z.string().trim().toUpperCase().regex(/^[A-Z0-9]{16}$/, 'Codice fiscale non valido').optional()),

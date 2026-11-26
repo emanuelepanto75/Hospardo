@@ -6,13 +6,14 @@ import { useAuth } from '../lib/auth';
 import { DateTime, euro, fmtDateTime } from '../lib/time';
 import { groupByCategory } from '../lib/constants';
 import MovementForm from '../components/stock/MovementForm';
+import Drafts from '../components/stock/Drafts';
 import Modal from '../components/Modal';
 import {
   ItemForm, ItemSearch, MOVE_TYPE, STOCK_STATUS, ScanInput, canManageStock, day, expiryClass, qty, toNumber,
 } from '../components/stock/common';
 
 const TABS = [
-  ['giacenze', 'Giacenze'], ['carico', 'Carico'], ['scarico', 'Scarico'], ['scadenze', 'Scadenze'],
+  ['daconfermare', 'Da confermare'], ['giacenze', 'Giacenze'], ['carico', 'Carico'], ['scarico', 'Scarico'], ['scadenze', 'Scadenze'],
   ['impianti', 'Impianti'], ['movimenti', 'Movimenti'], ['materiali', 'Materiali per prestazione'],
 ];
 
@@ -20,8 +21,9 @@ const TABS = [
 export default function Stock() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') || 'giacenze';
   const { data: summary, reload: reloadSummary } = useApi('/stock/summary');
+  // il medico arriva direttamente sugli scarichi da confermare, se ce ne sono
+  const tab = params.get('tab') || (user.role === 'MEDICO' && summary?.drafts ? 'daconfermare' : 'giacenze');
   const changed = () => { reloadSummary(); window.dispatchEvent(new Event('hospardo:stock')); };
 
   return (
@@ -30,14 +32,16 @@ export default function Stock() {
         <h1>Magazzino</h1>
         {summary && (
           <div className="row small">
+            {summary.drafts > 0 && <button className="link" onClick={() => setParams({ tab: 'daconfermare' })}>✔ {summary.drafts} materiali da confermare</button>}
             {summary.lowStock > 0 && <button className="link" onClick={() => setParams({ tab: 'giacenze', filtro: 'sottoscorta' })}>⚠ {summary.lowStock} articoli sottoscorta o esauriti</button>}
             {summary.expiring > 0 && <button className="link" onClick={() => setParams({ tab: 'scadenze' })}>⌛ {summary.expiring} lotti in scadenza</button>}
           </div>
         )}
       </div>
       <div className="tabs">
-        {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setParams({ tab: k })}>{l}</button>)}
+        {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setParams({ tab: k })}>{l}{k === 'daconfermare' && summary?.drafts > 0 && <span className="tab-badge">{summary.drafts}</span>}</button>)}
       </div>
+      {tab === 'daconfermare' && <Drafts user={user} onChanged={changed} />}
       {tab === 'giacenze' && <Inventory user={user} filter={params.get('filtro') || ''} setFilter={(f) => setParams(f ? { tab, filtro: f } : { tab })} />}
       {tab === 'carico' && <MovementForm key="load" mode="load" user={user} onDone={changed} />}
       {tab === 'scarico' && <MovementForm key="unload" mode="unload" user={user} onDone={changed} />}
@@ -264,7 +268,7 @@ function Materials({ user }) {
 
   return (
     <>
-      <p className="muted small">Quando un odontoiatra registra un trattamento nel diario (anche da piano di cura) con una di queste prestazioni, i materiali indicati vengono scaricati in automatico dai lotti che scadono prima. Se il trattamento viene eliminato, tornano in giacenza.</p>
+      <p className="muted small">Quando un odontoiatra registra un trattamento nel diario (anche da piano di cura) con una di queste prestazioni, i materiali indicati finiscono nella lista <b>Da confermare</b>: il medico li controlla e li conferma a fine giornata, e solo allora vengono scaricati (dai lotti che scadono prima, se non sceglie il lotto). Se il trattamento viene eliminato, le righe spariscono o, se già confermate, tornano in giacenza.</p>
       {!services || !rows ? <p className="muted">Caricamento…</p> : dental.length === 0 ? <div className="empty">Nessuna prestazione di categoria Odontoiatria.</div> : (
         Object.entries(groupByCategory(dental)).map(([cat, list]) => (
           <div key={cat}>

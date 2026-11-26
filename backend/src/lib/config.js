@@ -14,6 +14,12 @@ const config = {
     // mostrati nella pagina web pubblica
     email: process.env.CLINIC_EMAIL || '',
     hours: process.env.CLINIC_HOURS || '',
+    // informativa privacy (titolare del trattamento): ragione sociale, P.IVA, PEC, email privacy, DPO se nominato
+    legalName: process.env.PRIVACY_CONTROLLER || process.env.CLINIC_NAME || '',
+    vatNumber: process.env.PRIVACY_VAT || '',
+    pec: process.env.PRIVACY_PEC || '',
+    privacyEmail: process.env.PRIVACY_EMAIL || process.env.CLINIC_EMAIL || '',
+    dpo: process.env.PRIVACY_DPO || '',
     description: process.env.CLINIC_DESCRIPTION || '',
     showPrices: process.env.SITE_SHOW_PRICES !== 'false',
     showDurations: process.env.SITE_SHOW_DURATIONS !== 'false',

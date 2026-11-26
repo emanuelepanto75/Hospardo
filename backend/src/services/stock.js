@@ -47,22 +47,26 @@ async function consume(tx, { itemId, quantity, lotId, ...rest }) {
   return out;
 }
 
-/** Materiali previsti dalla prestazione del trattamento: scarico automatico */
-async function applyTreatmentMaterials(tx, treatment, userId) {
+/**
+ * Materiali previsti dalla prestazione del trattamento: non si scaricano subito,
+ * vanno nella lista "da confermare" del medico (di solito a fine giornata).
+ */
+async function applyTreatmentMaterials(tx, treatment) {
   if (!treatment.serviceId) return [];
   const materials = await tx.serviceMaterial.findMany({ where: { serviceId: treatment.serviceId, item: { active: true } } });
-  const out = [];
-  for (const m of materials) {
-    out.push(...await consume(tx, {
-      itemId: m.itemId, quantity: m.quantity, auto: true, treatmentId: treatment.id,
-      patientId: treatment.patientId, tooth: treatment.tooth, note: 'Scarico automatico da trattamento', createdById: userId,
-    }));
-  }
-  return out;
+  if (!materials.length) return [];
+  await tx.stockUnloadDraft.createMany({
+    data: materials.map((m) => ({
+      itemId: m.itemId, quantity: m.quantity, doctorId: treatment.doctorId, patientId: treatment.patientId,
+      tooth: treatment.tooth, treatmentId: treatment.id, date: treatment.date,
+    })),
+  });
+  return materials;
 }
 
-/** Annulla gli scarichi automatici di un trattamento (modifica o eliminazione) */
+/** Annulla gli scarichi automatici di un trattamento (modifica o eliminazione): bozze e scarichi già confermati */
 async function reverseTreatmentMaterials(tx, treatmentId) {
+  await tx.stockUnloadDraft.deleteMany({ where: { treatmentId } });
   const moves = await tx.stockMovement.findMany({ where: { treatmentId, auto: true } });
   for (const m of moves) {
     await tx.stockItem.update({ where: { id: m.itemId }, data: { quantity: { decrement: m.quantity } } });

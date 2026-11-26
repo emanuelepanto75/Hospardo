@@ -3,7 +3,8 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { requireRole, isAdmin } = require('../middleware/auth');
-const { hmToMin } = require('../lib/time');
+const { hmToMin, DateTime, TZ, dayBounds, localToDate } = require('../lib/time');
+const { dateOnly } = require('../lib/schedule');
 
 const doctorSchema = z.object({
   firstName: z.string().trim(),
@@ -24,6 +25,10 @@ const doctorSchema = z.object({
 const include = {
   services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },
   workingHours: { orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] },
+  // eccezioni recenti e future (per agenda e scheda medico): calcolate a ogni richiesta
+  get scheduleExceptions() {
+    return { where: { date: { gte: new Date(Date.now() - 120 * 86400000) } }, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] };
+  },
 };
 const out = (d) => ({
   ...d,
@@ -208,6 +213,49 @@ router.put('/:id/hours', ah(async (req, res) => {
   ]);
   const saved = await prisma.workingHours.findMany({ where: { doctorId }, orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] });
   res.json(saved);
+}));
+
+// ---- Eccezioni all'orario (giorni con orario diverso da quello abituale) ----
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida');
+
+router.get('/:id/exceptions', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  const from = isoDay.optional().parse(req.query.from) || DateTime.now().setZone(TZ).minus({ days: 30 }).toISODate();
+  const rows = await prisma.scheduleException.findMany({ where: { doctorId, date: { gte: dateOnly(from) } }, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] });
+  res.json(rows);
+}));
+
+/** Imposta le fasce di una data (sostituisce quelle già impostate per quella data) */
+router.put('/:id/exceptions/:date', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const date = isoDay.parse(req.params.date);
+  const { blocks, note } = z.object({
+    blocks: z.array(z.object({ startTime: hm, endTime: hm })).min(1, 'Indica almeno una fascia oraria').max(6),
+    note: z.string().trim().max(200).nullable().optional(),
+  }).parse(req.body);
+  const sorted = [...blocks].sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
+  for (const [i, b] of sorted.entries()) {
+    if (hmToMin(b.endTime) <= hmToMin(b.startTime)) throw new HttpError(400, `Fascia non valida: ${b.startTime}-${b.endTime}`);
+    if (i && hmToMin(b.startTime) < hmToMin(sorted[i - 1].endTime)) throw new HttpError(400, 'Fasce orarie sovrapposte');
+  }
+  await prisma.$transaction([
+    prisma.scheduleException.deleteMany({ where: { doctorId, date: dateOnly(date) } }),
+    prisma.scheduleException.createMany({ data: sorted.map((b) => ({ doctorId, date: dateOnly(date), ...b, note: note || null })) }),
+  ]);
+  // appuntamenti di quel giorno che restano fuori dal nuovo orario
+  const { start, end } = dayBounds(date);
+  const appts = await prisma.appointment.findMany({ where: { doctorId, status: { in: ['PRENOTATO', 'CONFERMATO'] }, start: { gte: start, lt: end } } });
+  const outside = appts.filter((a) => !sorted.some((b) => a.start >= localToDate(date, b.startTime) && a.end <= localToDate(date, b.endTime))).length;
+  res.json({ date, blocks: sorted, outsideAppointments: outside });
+}));
+
+router.delete('/:id/exceptions/:date', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const date = isoDay.parse(req.params.date);
+  await prisma.scheduleException.deleteMany({ where: { doctorId, date: dateOnly(date) } });
+  res.status(204).end();
 }));
 
 // ---- Assenze / ferie ----

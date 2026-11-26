@@ -4,6 +4,7 @@
  */
 const PDFDocument = require('pdfkit');
 const prisma = require('../lib/prisma');
+const { hoursForDate } = require('../lib/schedule');
 const config = require('../lib/config');
 const { DateTime, TZ, hmToMin, localToDate, dayBounds } = require('../lib/time');
 const { freeIntervals } = require('./agendaReport');
@@ -29,7 +30,7 @@ const euro = (cents) => (cents == null ? '' : (cents / 100).toLocaleString('it-I
 async function buildDoctorWeek(doctorId, date, period = 'week') {
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId },
-    include: { workingHours: true, services: { include: { service: true } } },
+    include: { workingHours: true, scheduleExceptions: true, services: { include: { service: true } } },
   });
   if (!doctor) return null;
 
@@ -56,9 +57,7 @@ async function buildDoctorWeek(doctorId, date, period = 'week') {
     const d = monday.plus({ days: i });
     const iso = d.toISODate();
     const { start, end } = dayBounds(iso);
-    const blocks = doctor.workingHours
-      .filter((h) => h.weekday === d.weekday)
-      .sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
+    const blocks = hoursForDate(doctor.workingHours, doctor.scheduleExceptions, iso, d.weekday);
     const dayAppts = appointments.filter((a) => a.start >= start && a.start < end);
     if (!isDay && d.weekday === 7 && !blocks.length && !dayAppts.length) continue; // domenica solo se serve
 

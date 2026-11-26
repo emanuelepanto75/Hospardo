@@ -5,6 +5,7 @@
 const ExcelJS = require('exceljs');
 const cron = require('node-cron');
 const prisma = require('../lib/prisma');
+const { hoursForDate, dateOnly } = require('../lib/schedule');
 const config = require('../lib/config');
 const { DateTime, TZ, hmToMin, localToDate, dayBounds } = require('../lib/time');
 const { sendMail } = require('./mailer');
@@ -52,7 +53,7 @@ async function collect(days) {
   const [doctors, appointments, timeOff] = await Promise.all([
     prisma.doctor.findMany({
       where: { active: true, archivedAt: null },
-      include: { workingHours: true },
+      include: { workingHours: true, scheduleExceptions: { where: { date: { gte: dateOnly(days[0]), lte: dateOnly(days[days.length - 1]) } } } },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     }),
     prisma.appointment.findMany({
@@ -68,9 +69,7 @@ async function collect(days) {
     const weekday = DateTime.fromISO(date, { zone: TZ }).weekday;
     const appts = appointments.filter((a) => a.start >= start && a.start < end && ACTIVE.includes(a.status));
     const doctorsInfo = doctors.map((d) => {
-      const blocks = d.workingHours
-        .filter((h) => h.weekday === weekday)
-        .sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime))
+      const blocks = hoursForDate(d.workingHours, d.scheduleExceptions, date, weekday)
         .map((h) => [localToDate(date, h.startTime), localToDate(date, h.endTime)]);
       const absences = timeOff.filter((t) => t.doctorId === d.id && t.start < end && t.end > start);
       const busy = [

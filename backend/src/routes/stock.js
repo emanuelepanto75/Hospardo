@@ -56,10 +56,65 @@ router.get('/summary', ah(async (req, res) => {
   const items = await prisma.stockItem.findMany({ where: { active: true }, select: { quantity: true, minStock: true } });
   const limit = dateOnly(DateTime.now().setZone(TZ).plus({ days: 60 }).toISODate());
   const expiring = await prisma.stockLot.count({ where: { quantity: { gt: 0 }, expiry: { lte: limit }, item: { active: true } } });
+  const drafts = await prisma.stockUnloadDraft.count({ where: draftScope(req.user) });
   res.json({
     lowStock: items.filter((i) => i.quantity <= 0 || (i.minStock > 0 && i.quantity <= i.minStock)).length,
     expiring,
+    drafts,
   });
+}));
+
+// ------------------------------------------------------------------ scarichi da confermare
+
+/** Il medico vede e conferma i propri; amministratori tutti; la segreteria li vede soltanto */
+const draftScope = (user) => (user.role === 'MEDICO' ? { doctorId: user.doctorId ?? -1 } : {});
+const canConfirm = (user, draft) => isAdmin(user) || (user.role === 'MEDICO' && draft.doctorId === user.doctorId);
+
+router.get('/drafts', ah(async (req, res) => {
+  const drafts = await prisma.stockUnloadDraft.findMany({
+    where: draftScope(req.user),
+    include: {
+      item: { include: { lots: { where: { quantity: { gt: 0 } }, orderBy: [{ expiry: { sort: 'asc', nulls: 'last' } }, { lot: 'asc' }] } } },
+      doctor: { select: { id: true, title: true, firstName: true, lastName: true } },
+      patient: { select: { id: true, firstName: true, lastName: true } },
+      treatment: { select: { id: true, description: true } },
+    },
+    orderBy: [{ date: 'asc' }, { patientId: 'asc' }, { id: 'asc' }],
+  });
+  res.json(drafts);
+}));
+
+/** Conferma: ogni riga diventa uno scarico (quantità e lotto eventualmente corretti); le righe in "remove" si scartano */
+router.post('/drafts/confirm', ah(async (req, res) => {
+  const data = z.object({
+    rows: z.array(z.object({ id: z.number().int(), quantity: z.number().min(0), lotId: z.number().int().nullable().optional() })).default([]),
+    remove: z.array(z.number().int()).default([]),
+  }).parse(req.body);
+  const ids = [...data.rows.map((r) => r.id), ...data.remove];
+  const drafts = await prisma.stockUnloadDraft.findMany({ where: { id: { in: ids } } });
+  if (drafts.length !== new Set(ids).size) throw new HttpError(409, 'Alcune righe non sono più da confermare: ricarica la pagina');
+  const denied = drafts.find((d) => !canConfirm(req.user, d));
+  if (denied) throw new HttpError(403, 'Gli scarichi li conferma il medico che ha eseguito il trattamento (o un amministratore)');
+  const byId = new Map(drafts.map((d) => [d.id, d]));
+  let moved = 0;
+  await prisma.$transaction(async (tx) => {
+    for (const r of data.rows) {
+      const d = byId.get(r.id);
+      if (r.quantity > 0) {
+        if (r.lotId) {
+          const lot = await tx.stockLot.findUnique({ where: { id: r.lotId } });
+          if (!lot || lot.itemId !== d.itemId) throw new HttpError(400, 'Lotto non valido');
+        }
+        await consume(tx, {
+          itemId: d.itemId, quantity: r.quantity, lotId: r.lotId || null, auto: true, treatmentId: d.treatmentId,
+          patientId: d.patientId, tooth: d.tooth, note: 'Scarico da trattamento, confermato dal medico', createdById: req.user.id,
+        });
+        moved += 1;
+      }
+    }
+    await tx.stockUnloadDraft.deleteMany({ where: { id: { in: ids } } });
+  });
+  res.json({ confirmed: moved, discarded: ids.length - moved });
 }));
 
 router.get('/items/:id', ah(async (req, res) => {

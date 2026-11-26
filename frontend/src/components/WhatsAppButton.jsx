@@ -1,4 +1,5 @@
 import { api } from '../lib/api';
+import { waHref } from '../lib/whatsapp';
 
 /**
  * Apre WhatsApp (app o web) sulla chat del paziente con il messaggio già scritto.
@@ -10,8 +11,8 @@ export default function WhatsAppButton({ appointmentId, link, kind, label, optIn
   return (
     <a
       className={`btn btn-wa ${small ? 'btn-sm' : ''}`}
-      href={link.url}
-      target="_blank"
+      href={waHref(link.url)}
+      target={waHref(link.url).startsWith('whatsapp:') ? undefined : '_blank'}
       rel="noopener noreferrer"
       title={`Apre WhatsApp per ${link.phone} con il messaggio pronto`}
       onClick={() => {

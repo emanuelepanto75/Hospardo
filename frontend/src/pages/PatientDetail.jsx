@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { api, errorMessage } from '../lib/api';
 import { useApi } from '../lib/useApi';
 import { fmtDateTime } from '../lib/time';
-import { STATUS, doctorName } from '../lib/constants';
+import { STATUS, doctorName, isAdmin } from '../lib/constants';
 import PatientForm from '../components/PatientForm';
 import AppointmentModal from '../components/AppointmentModal';
 import DentalChart from '../components/DentalChart';
@@ -76,6 +77,8 @@ export default function PatientDetail() {
         <div className="table-wrap"><table className="table"><tbody>{past.map((a) => <Row key={a.id} a={a} />)}</tbody></table></div>
       )}
 
+      {isAdmin(user) && <DeletePatient patient={p} />}
+
       {booking && (
         <AppointmentModal draft={{ patient: p }} doctors={doctors} services={services} onClose={() => setBooking(false)} onSaved={() => { setBooking(false); reload(); }} />
       )}
@@ -83,3 +86,30 @@ export default function PatientDetail() {
   );
 }
 
+
+/** Eliminazione definitiva del paziente (solo amministratori) */
+function DeletePatient({ patient }) {
+  const nav = useNavigate();
+  const [msg, setMsg] = useState(null);
+  async function remove() {
+    const n = patient.appointments.length;
+    const typed = window.prompt(
+      `Eliminare DEFINITIVAMENTE ${patient.lastName} ${patient.firstName}?\n\n`
+      + `Verranno cancellati anche ${n} appuntamenti con i messaggi inviati, le richieste dal sito, la cartella dentale e i piani di cura. `
+      + `Gli impianti applicati restano nel registro del magazzino (tracciabilità obbligatoria).\n\nPer confermare scrivi il cognome del paziente:`,
+    );
+    if (typed == null) return;
+    try {
+      await api(`/patients/${patient.id}`, { method: 'DELETE', body: { confirm: typed } });
+      nav('/pazienti', { replace: true });
+    } catch (e) { setMsg(errorMessage(e)); }
+  }
+  return (
+    <div className="card danger-zone">
+      <h3>Eliminazione del paziente</h3>
+      <p className="muted small">Da usare per errori di inserimento, doppioni o richiesta di cancellazione del paziente. Non si può annullare.</p>
+      {msg && <div className="alert">{msg}</div>}
+      <button className="btn btn-danger" onClick={remove}>Elimina paziente</button>
+    </div>
+  );
+}

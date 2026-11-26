@@ -13,9 +13,14 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   - suggerimento degli orari liberi, blocco delle sovrapposizioni (forzabile per urgenze)
 - **Pazienti**: ricerca rapida (nome, cognome, telefono, email, codice fiscale), scheda con
   dati anagrafici, consensi, storico e prossimi appuntamenti, creazione al volo dall'agenda
+  - iniziali maiuscole automatiche, luogo di nascita con suggerimenti (comuni anche soppressi e stati esteri),
+    **calcolo del codice fiscale**; eliminazione definitiva riservata agli amministratori
+  - **informativa privacy** pubblica su `/privacy` (dati del titolare da `PRIVACY_*` in `backend/.env`), collegata
+    al modulo di prenotazione e stampabile per la firma
 - **Medici e orari**: dati del medico, colore in agenda, orari settimanali con più fasce al giorno,
   ferie e assenze (con avviso se ci sono appuntamenti nel periodo)
   - tabella **Prestazioni erogate** per medico, con durata e prezzo personalizzabili
+  - **eccezioni all'orario**: giorni o settimane con orari diversi da quelli abituali (sostituiscono l'orario del giorno)
   - medico non più in servizio: **eliminazione** (se senza storico) o **archiviazione**, con annullamento
     e avviso ai pazienti degli appuntamenti futuri
 - **Prestazioni**: categoria (es. Odontoiatria), durata, prezzo, medici abilitati, prenotabilità online
@@ -31,7 +36,7 @@ prestazioni, orari di disponibilità, promemoria via email e **prenotazione onli
   scorta minima e avviso sottoscorta, carichi (fornitore, DDT, costo), scarichi, rettifiche d'inventario, lotti e
   scadenze, codici EAN e **GS1** (dai codici di impianti e dispositivi si leggono anche lotto e scadenza),
   **tracciabilità degli impianti** su paziente e dente con ricerca per lotto, **scarico automatico** dei materiali
-  previsti per ogni prestazione quando il trattamento è registrato nel diario
+  previsti per ogni prestazione, che il medico **conferma a fine giornata** (lista "Da confermare")
 - **Utenti e ruoli**: Amministratore, Segreteria, Medico (il medico modifica solo la propria agenda)
 
 **Area pubblica (pazienti, senza login)**

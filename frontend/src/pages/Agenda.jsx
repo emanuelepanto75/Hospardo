@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../lib/useApi';
+import { hoursForDate, hasException } from '../lib/schedule';
 import { useAuth } from '../lib/auth';
 import { DateTime, hmToMin, minToHm } from '../lib/time';
 import { STATUS, doctorName } from '../lib/constants';
@@ -106,7 +107,7 @@ export default function Agenda() {
     const days = [];
     for (let i = 0; i < 7; i++) {
       const day = rangeStart.plus({ days: i });
-      if (day.weekday === 7 && !weekDoc.workingHours.some((h) => h.weekday === 7)) continue;
+      if (day.weekday === 7 && !hoursForDate(weekDoc, day).length) continue;
       days.push({ key: day.toISODate(), date: day, doctor: weekDoc, title: day.toFormat('ccc d'), sub: day.toFormat('LLLL') });
     }
     return days;
@@ -117,7 +118,7 @@ export default function Agenda() {
     let lo = 8 * 60;
     let hi = 19 * 60;
     for (const c of columns) {
-      for (const h of c.doctor.workingHours) {
+      for (const h of hoursForDate(c.doctor, c.date)) {
         lo = Math.min(lo, hmToMin(h.startTime));
         hi = Math.max(hi, hmToMin(h.endTime));
       }
@@ -184,6 +185,7 @@ export default function Agenda() {
 
   return (
     <div className="page page-agenda">
+      {user.role === 'MEDICO' && user.dental && <DraftsNotice />}
       <div className="toolbar">
         <div className="toolbar-group">
           <button className="btn" onClick={() => setDate(DateTime.now().startOf('day'))}>Oggi</button>
@@ -274,13 +276,13 @@ export default function Agenda() {
             {hours.map((m) => <div key={m} className="hour-label" style={{ top: y(m) }}>{minToHm(m)}</div>)}
           </div>
           {columns.map((c) => {
-            const blocks = c.doctor.workingHours.filter((h) => h.weekday === c.date.weekday);
+            const blocks = hoursForDate(c.doctor, c.date);
             const nowMin = now.hour * 60 + now.minute;
             return (
               <div key={c.key} className="cal-col" style={{ height }} onClick={(e) => onColumnClick(e, c)}>
                 {hours.map((m) => <div key={m} className="hour-line" style={{ top: y(m) }} />)}
                 {blocks.map((b) => (
-                  <div key={b.id} className="work-block" style={{ top: y(hmToMin(b.startTime)), height: (hmToMin(b.endTime) - hmToMin(b.startTime)) * PX_PER_MIN }} />
+                  <div key={`${b.id}-${b.startTime}`} className={`work-block ${hasException(c.doctor, c.date) ? 'work-exception' : ''}`} style={{ top: y(hmToMin(b.startTime)), height: (hmToMin(b.endTime) - hmToMin(b.startTime)) * PX_PER_MIN }} />
                 ))}
                 {columnOff(c).map((t) => (
                   <div key={t.id} className="off-block" style={{ top: y(t.startMin), height: (t.endMin - t.startMin) * PX_PER_MIN }} title={t.reason || 'Assenza'}>
@@ -323,6 +325,7 @@ export default function Agenda() {
         {Object.values(STATUS).map((s) => <span key={s.label}><span className="dot" style={{ background: s.color }} /> {s.label}</span>)}
         <span><span className="swatch-off" /> Assenza</span>
         <span><span className="swatch-closed" /> Fuori orario</span>
+        <span><span className="swatch-exception" /> Orario straordinario</span>
       </div>
 
       {modal && (
@@ -362,6 +365,18 @@ function WaNotice({ appt, kind, onClose }) {
       </span>
       <WhatsAppButton appointmentId={appt.id} link={link} kind={kind} label={t.action} optIn={appt.patient.whatsappOptIn} onLogged={onClose} />
       <button className="icon-btn" aria-label="Chiudi" onClick={onClose}>×</button>
+    </div>
+  );
+}
+
+/** Promemoria per il dentista: materiali dei trattamenti ancora da confermare */
+function DraftsNotice() {
+  const { data } = useApi('/stock/summary');
+  if (!data?.drafts) return null;
+  return (
+    <div className="notice drafts-notice">
+      Hai <b>{data.drafts}</b> materiali dei trattamenti da confermare per lo scarico dal magazzino.{' '}
+      <Link to="/magazzino?tab=daconfermare">Controlla e conferma</Link>
     </div>
   );
 }

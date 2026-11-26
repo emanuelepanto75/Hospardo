@@ -163,6 +163,8 @@ router.put('/patients/:id/treatments/:tid', ah(async (req, res) => {
       await reverseTreatmentMaterials(tx, current.id);
       await applyTreatmentMaterials(tx, updated, req.user.id);
     }
+    // materiali ancora da confermare: seguono data, medico e dente del trattamento
+    await tx.stockUnloadDraft.updateMany({ where: { treatmentId: current.id }, data: { date: updated.date, doctorId: updated.doctorId, tooth: updated.tooth } });
     return updated;
   });
   res.json(t);

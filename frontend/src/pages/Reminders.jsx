@@ -3,6 +3,7 @@ import { api, errorMessage } from '../lib/api';
 import { DateTime, fmtTime } from '../lib/time';
 import { doctorName, NOTIFICATION_STATUS } from '../lib/constants';
 import WhatsAppButton from '../components/WhatsAppButton';
+import { WA_MODES, getWaMode, setWaMode } from '../lib/whatsapp';
 
 /**
  * Promemoria WhatsApp con un clic: i pazienti del giorno scelto (default il prossimo giorno lavorativo),
@@ -44,6 +45,7 @@ export default function Reminders() {
           <button className="btn btn-icon" onClick={() => shift(1)} aria-label="Giorno successivo">›</button>
         </div>
       </div>
+      <WaModePicker />
       {err && <div className="alert">{err}</div>}
       {data && (
         <>
@@ -83,6 +85,20 @@ export default function Reminders() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Scelta, per questo PC, di dove aprire i messaggi: app WhatsApp Business, WhatsApp Web o wa.me */
+function WaModePicker() {
+  const [mode, setMode] = useState(getWaMode());
+  return (
+    <div className="row small wa-mode">
+      <span>Apri i messaggi con:</span>
+      <select value={mode} onChange={(e) => { setWaMode(e.target.value); setMode(e.target.value); }} style={{ width: 'auto' }}>
+        {Object.entries(WA_MODES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
+      <span className="muted">(impostazione di questo PC)</span>
     </div>
   );
 }

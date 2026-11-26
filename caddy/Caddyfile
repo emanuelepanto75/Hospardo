@@ -29,9 +29,9 @@
 
 (sito) {
 	import sicurezza
-	# pagine e dati pubblici dell'agenda sul dominio del sito: prenotazione, gestione appuntamento
+	# pagine e dati pubblici dell'agenda sul dominio del sito: prenotazione, gestione appuntamento, informativa privacy
 	# dal link nelle email, dati della pagina (contatti, prestazioni, medici). Nessuna pagina riservata.
-	@agenda_pubblica path /prenota /prenota/* /appuntamento/* /assets/* /api/public/*
+	@agenda_pubblica path /prenota /prenota/* /appuntamento/* /privacy /assets/* /api/public/*
 	handle @agenda_pubblica {
 		reverse_proxy app:4100
 	}

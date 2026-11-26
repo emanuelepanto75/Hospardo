@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const { hmToMin, localToDate, dayBounds, isoWeekday, overlaps, DateTime, TZ } = require('../lib/time');
+const { hoursForDate, dateOnly } = require('../lib/schedule');
 
 const ACTIVE_STATUSES = ['PRENOTATO', 'CONFERMATO', 'IN_ATTESA', 'COMPLETATO'];
 
@@ -10,7 +11,7 @@ const ACTIVE_STATUSES = ['PRENOTATO', 'CONFERMATO', 'IN_ATTESA', 'COMPLETATO'];
 async function getFreeSlots({ doctorId, date, durationMin, notBefore, holds = false, excludeRequestId }) {
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId },
-    include: { workingHours: { where: { weekday: isoWeekday(date) } } },
+    include: { workingHours: { where: { weekday: isoWeekday(date) } }, scheduleExceptions: { where: { date: dateOnly(date) } } },
   });
   if (!doctor || !doctor.active) return [];
 
@@ -39,7 +40,7 @@ async function getFreeSlots({ doctorId, date, durationMin, notBefore, holds = fa
   }
 
   const step = doctor.slotStepMin || 15;
-  const blocks = [...doctor.workingHours].sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
+  const blocks = hoursForDate(doctor.workingHours, doctor.scheduleExceptions, date, isoWeekday(date));
   const slots = [];
   for (const block of blocks) {
     const blockStart = localToDate(date, block.startTime);
@@ -87,7 +88,11 @@ async function lockDoctor(tx, doctorId) {
 async function isWithinWorkingHours({ doctorId, start, end }) {
   const local = DateTime.fromJSDate(start).setZone(TZ);
   const date = local.toISODate();
-  const hours = await prisma.workingHours.findMany({ where: { doctorId, weekday: local.weekday } });
+  const [weekly, exceptions] = await Promise.all([
+    prisma.workingHours.findMany({ where: { doctorId, weekday: local.weekday } }),
+    prisma.scheduleException.findMany({ where: { doctorId, date: dateOnly(date) } }),
+  ]);
+  const hours = hoursForDate(weekly, exceptions, date, local.weekday);
   const inHours = hours.some((h) => start >= localToDate(date, h.startTime) && end <= localToDate(date, h.endTime));
   if (!inHours) return false;
   const off = await prisma.timeOff.findFirst({ where: { doctorId, start: { lt: end }, end: { gt: start } } });

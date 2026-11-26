@@ -138,7 +138,17 @@ router.get('/:id', ah(async (req, res) => {
   });
   if (!appt) throw notFound('Appuntamento');
   if (req.user.role === 'MEDICO' && appt.doctorId !== req.user.doctorId) throw new HttpError(403, 'Puoi vedere solo i tuoi appuntamenti');
-  res.json({ ...appt, whatsappLinks: whatsappLinks(appt) });
+  // chi ha preso l'appuntamento e quando (per le prenotazioni dal sito: richiesta e conferma)
+  const request = await prisma.bookingRequest.findUnique({ where: { appointmentId: appt.id }, select: { createdAt: true, handledById: true, handledAt: true } });
+  const ids = [appt.createdById, request?.handledById].filter(Boolean);
+  const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, role: true } }) : [];
+  const who = (id) => users.find((u) => u.id === id) || null;
+  const origin = {
+    createdAt: appt.createdAt,
+    createdBy: who(appt.createdById),
+    request: request ? { sentAt: request.createdAt, confirmedAt: request.handledAt, confirmedBy: who(request.handledById) } : null,
+  };
+  res.json({ ...appt, origin, whatsappLinks: whatsappLinks(appt) });
 }));
 
 router.post('/', ah(async (req, res) => {

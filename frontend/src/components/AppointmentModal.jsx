@@ -13,6 +13,29 @@ import WhatsAppButton from './WhatsAppButton';
  * - appointment: appuntamento esistente (modifica)
  * - draft: { doctorId, start, patient, serviceId, durationMin, notes } per un nuovo appuntamento
  */
+const ROLE_LABEL = { SUPERADMIN: 'amministratore', ADMIN: 'amministratore', SEGRETERIA: 'segreteria', MEDICO: 'medico' };
+const whoLabel = (u) => (u ? `${u.name} (${ROLE_LABEL[u.role] || u.role})` : null);
+
+/** Chi ha preso l'appuntamento e quando */
+function AppointmentOrigin({ id, createdAt }) {
+  const [o, setO] = useState(null);
+  useEffect(() => { api(`/appointments/${id}`).then((a) => setO(a.origin)).catch(() => {}); }, [id]);
+  if (!o) return <span className="muted small">Inserito il {fmtDateTime(createdAt)}</span>;
+  if (o.request) {
+    return (
+      <span className="muted small appt-origin">
+        Richiesta dal sito il {fmtDateTime(o.request.sentAt)}
+        {o.request.confirmedAt && <> · confermata il {fmtDateTime(o.request.confirmedAt)}{o.request.confirmedBy && <> da <b>{whoLabel(o.request.confirmedBy)}</b></>}</>}
+      </span>
+    );
+  }
+  return (
+    <span className="muted small appt-origin">
+      Preso il {fmtDateTime(o.createdAt)}{o.createdBy ? <> da <b>{whoLabel(o.createdBy)}</b></> : ''}
+    </span>
+  );
+}
+
 export default function AppointmentModal({ appointment, draft, doctors, services, onClose, onSaved }) {
   const { user } = useAuth();
   const isNew = !appointment;
@@ -112,7 +135,7 @@ export default function AppointmentModal({ appointment, draft, doctors, services
         <div className="appt-summary">
           <span className="badge" style={{ background: STATUS[appointment.status].color }}>{STATUS[appointment.status].label}</span>
           {appointment.source === 'ONLINE' && <span className="badge badge-outline">Prenotato online</span>}
-          <span className="muted small">Inserito il {fmtDateTime(appointment.createdAt)}</span>
+          <AppointmentOrigin id={appointment.id} createdAt={appointment.createdAt} />
           {!readOnly && (
             <div className="quick-actions">
               {appointment.status !== 'CONFERMATO' && appointment.status !== 'COMPLETATO' && <button className="btn btn-sm" onClick={() => quickStatus('CONFERMATO')}>Conferma</button>}
