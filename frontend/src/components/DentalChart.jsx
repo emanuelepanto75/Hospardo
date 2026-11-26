@@ -274,11 +274,34 @@ export default function DentalChart({ patientId, user }) {
 
   const defaultDoctorId = user.role === 'MEDICO' ? user.doctorId : undefined;
 
+  async function setEnabled(enabled) {
+    if (!enabled && !window.confirm('Disattivare la cartella dentale di questo paziente? Potrai riattivarla in qualsiasi momento.')) return;
+    setMsg(null);
+    try { await api(`${base}/enabled`, { method: 'PUT', body: { enabled } }); setSelected(null); setForm(null); reload(); } catch (e) { setMsg(errorMessage(e)); }
+  }
+
+  if (!data.dentalEnabled) {
+    return (
+      <section className="dental" id="odontoiatria" ref={ref}>
+        <div className="card row dental-off">
+          <div style={{ flex: 1 }}>
+            <b>Cartella dentale non attiva</b>
+            <div className="muted small">Attivala se il paziente è seguito dall'odontoiatria: comparirà l'odontogramma con il diario dei trattamenti.</div>
+          </div>
+          <button className="btn btn-primary" onClick={() => setEnabled(true)}>Attiva cartella dentale</button>
+        </div>
+        {msg && <div className="alert">{msg}</div>}
+      </section>
+    );
+  }
+  const empty = !data.treatments.length && !data.teeth.some((t) => t.status !== 'SANO' || t.note || Object.keys(t.surfaces || {}).length);
+
   return (
     <section className="dental" id="odontoiatria" ref={ref}>
       <div className="page-head" style={{ marginTop: 24 }}>
         <h2 style={{ margin: 0 }}>Odontoiatria</h2>
         <div className="row-end">
+          {empty && <button className="btn btn-ghost btn-sm" title="Possibile solo finché la cartella è vuota" onClick={() => setEnabled(false)}>Disattiva cartella</button>}
           <div className="segmented">
             <button className={!deciduous ? 'on' : ''} onClick={() => { setDeciduous(false); setSelected(null); }}>Permanenti</button>
             <button className={deciduous ? 'on' : ''} onClick={() => { setDeciduous(true); setSelected(null); }}>Da latte</button>

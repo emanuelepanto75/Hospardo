@@ -322,3 +322,4 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-directio
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; color: #4b5563; }
 .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #94a3b8; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 @media (max-width: 900px) { .dental-layout { grid-template-columns: 1fr; } .tooth-panel { width: auto; } }
+.dental-off { margin-top: 24px; border-left: 4px solid var(--primary); }

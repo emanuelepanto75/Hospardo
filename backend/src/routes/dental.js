@@ -20,15 +20,35 @@ const treatmentInclude = {
 };
 
 async function patientOr404(id) {
-  const p = await prisma.patient.findUnique({ where: { id }, select: { id: true } });
+  const p = await prisma.patient.findUnique({ where: { id }, select: { id: true, dentalEnabled: true } });
   if (!p) throw notFound('Paziente');
   return p;
 }
 
+/** Registrare qualcosa nella cartella la attiva */
+const enable = (tx, patientId) => tx.patient.update({ where: { id: patientId }, data: { dentalEnabled: true } });
+
+/** Attiva / disattiva la cartella dentale del paziente (disattivabile solo se vuota) */
+router.put('/patients/:id/enabled', ah(async (req, res) => {
+  const patientId = Number(req.params.id);
+  await patientOr404(patientId);
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+  if (!enabled) {
+    const [teeth, treatments] = await Promise.all([
+      prisma.dentalTooth.count({ where: { patientId, NOT: { status: 'SANO', surfaces: { equals: {} }, note: null } } }),
+      prisma.dentalTreatment.count({ where: { patientId } }),
+    ]);
+    if (teeth || treatments) throw new HttpError(409, 'La cartella contiene già dati e non può essere disattivata');
+    await prisma.dentalTooth.deleteMany({ where: { patientId } });
+  }
+  await prisma.patient.update({ where: { id: patientId }, data: { dentalEnabled: enabled } });
+  res.json({ dentalEnabled: enabled });
+}));
+
 /** Cartella completa: denti con stato diverso da "sano" + diario + dati utili al form */
 router.get('/patients/:id', ah(async (req, res) => {
   const patientId = Number(req.params.id);
-  await patientOr404(patientId);
+  const patient = await patientOr404(patientId);
   const [teeth, treatments, dentists, services, appointments] = await Promise.all([
     prisma.dentalTooth.findMany({ where: { patientId }, orderBy: { tooth: 'asc' } }),
     prisma.dentalTreatment.findMany({ where: { patientId }, include: treatmentInclude, orderBy: [{ date: 'desc' }, { id: 'desc' }] }),
@@ -43,7 +63,7 @@ router.get('/patients/:id', ah(async (req, res) => {
       select: { id: true, start: true, doctorId: true, service: { select: { name: true } } }, orderBy: { start: 'desc' }, take: 50,
     }),
   ]);
-  res.json({ teeth, treatments, dentists, services, appointments });
+  res.json({ dentalEnabled: patient.dentalEnabled, teeth, treatments, dentists, services, appointments });
 }));
 
 /** Stato di un dente (stato generale, superfici, nota) */
@@ -57,11 +77,14 @@ router.put('/patients/:id/teeth/:tooth', ah(async (req, res) => {
     note: z.string().trim().max(500).nullable().optional(),
   }).parse(req.body);
   const values = { status: data.status, surfaces: data.surfaces, note: data.note || null, updatedById: req.user.id };
-  const saved = await prisma.dentalTooth.upsert({
-    where: { patientId_tooth: { patientId, tooth } },
-    update: values,
-    create: { patientId, tooth, ...values },
-  });
+  const [saved] = await prisma.$transaction([
+    prisma.dentalTooth.upsert({
+      where: { patientId_tooth: { patientId, tooth } },
+      update: values,
+      create: { patientId, tooth, ...values },
+    }),
+    enable(prisma, patientId),
+  ]);
   res.json(saved);
 }));
 
@@ -108,6 +131,7 @@ router.post('/patients/:id/treatments', ah(async (req, res) => {
       include: treatmentInclude,
     });
     await applyToothStatus(tx, patientId, { ...data, toothStatus }, req.user.id);
+    await enable(tx, patientId);
     return created;
   });
   res.status(201).json(t);
