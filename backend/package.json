@@ -1,6 +1,6 @@
 {
   "name": "hospardo-backend",
-  "version": "1.13.2",
+  "version": "1.14.0",
   "private": true,
   "description": "Hospardo – API agenda studio medico (Express + Prisma + PostgreSQL)",
   "main": "src/index.js",

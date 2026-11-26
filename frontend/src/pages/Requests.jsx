@@ -11,17 +11,19 @@ const TABS = [
   { key: 'NUOVA', label: 'In attesa' },
   { key: 'CONFERMATA', label: 'Confermate' },
   { key: 'RIFIUTATA', label: 'Rifiutate' },
+  { key: 'ANNULLATI', label: 'Annullati dai pazienti' },
 ];
 
 /** Richieste di prenotazione arrivate dal sito, da confermare o rifiutare */
 export default function Requests() {
-  const [tab, setTab] = useState('NUOVA');
-  const { data: items, reload } = useApi('/requests', { status: tab });
+  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('vista') === 'annullati' ? 'ANNULLATI' : 'NUOVA'));
+  const { data: items, reload } = useApi(tab === 'ANNULLATI' ? null : '/requests', { status: tab });
+  const { data: counts, reload: reloadCounts } = useApi('/requests/count');
   const { data: doctors } = useApi('/doctors');
   const [confirming, setConfirming] = useState(null);
   const [msg, setMsg] = useState(null);
 
-  const refresh = () => { reload(); window.dispatchEvent(new Event('hospardo:requests')); };
+  const refresh = () => { reload(); reloadCounts(); window.dispatchEvent(new Event('hospardo:requests')); };
 
   async function reject(r) {
     const reason = window.prompt(
@@ -46,11 +48,17 @@ export default function Requests() {
           </p>
         </div>
         <div className="segmented">
-          {TABS.map((t) => <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>{t.label}</button>)}
+          {TABS.map((t) => (
+            <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>
+              {t.label}
+              {t.key === 'NUOVA' && counts?.count > 0 && <span className="tab-badge">{counts.count}</span>}
+              {t.key === 'ANNULLATI' && counts?.cancellations > 0 && <span className="tab-badge">{counts.cancellations}</span>}
+            </button>
+          ))}
         </div>
       </div>
       {msg && <div className={msg.ok ? 'notice' : 'alert'} style={{ marginBottom: 12 }}>{msg.text}</div>}
-      {!items ? <p className="muted">Caricamento…</p> : items.length === 0 ? (
+      {tab === 'ANNULLATI' ? <Cancellations onChanged={refresh} /> : !items ? <p className="muted">Caricamento…</p> : items.length === 0 ? (
         <div className="empty">{tab === 'NUOVA' ? 'Nessuna richiesta in attesa.' : 'Nessuna richiesta.'}</div>
       ) : (
         <div className="request-list">
@@ -59,17 +67,23 @@ export default function Requests() {
               <div className="request-main">
                 <div className="request-who">
                   <b>{r.lastName} {r.firstName}</b>
+                  {r.moveOf && <span className="badge" style={{ background: '#7c3aed' }}>Spostamento</span>}
                   <span className="muted small">ricevuta {fmtDateTime(r.createdAt)}</span>
                 </div>
                 <div className="small">
                   <a href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}>{r.phone}</a> · <a href={`mailto:${r.email}`}>{r.email}</a>
                   {!r.whatsappOptIn && <span className="muted"> · non vuole WhatsApp</span>}
                 </div>
-                <div><b>{r.service.name}</b> con {doctorName(r.doctor)}</div>
+                <div><b>{r.service?.name || 'Appuntamento'}</b> con {doctorName(r.doctor)}</div>
+                {r.moveOf && (
+                  <div className="small">Appuntamento attuale: <b>{DateTime.fromISO(r.moveOf.start).toFormat("cccc d LLLL 'alle' HH:mm")}</b>
+                    {!['PRENOTATO', 'CONFERMATO'].includes(r.moveOf.status) && <span className="badge" style={{ background: '#dc2626', marginLeft: 8 }}>non più attivo</span>}
+                  </div>
+                )}
                 <div>
                   {r.preferredStart ? (
                     <>
-                      Orario richiesto: <b>{DateTime.fromISO(r.preferredStart).toFormat("cccc d LLLL 'alle' HH:mm")}</b>
+                      {r.moveOf ? 'Nuovo orario richiesto' : 'Orario richiesto'}: <b>{DateTime.fromISO(r.preferredStart).toFormat("cccc d LLLL 'alle' HH:mm")}</b>
                       {tab === 'NUOVA' && (r.slotFree
                         ? <span className="badge" style={{ background: '#16a34a', marginLeft: 8 }}>ancora libero</span>
                         : <span className="badge" style={{ background: '#dc2626', marginLeft: 8 }}>non più libero</span>)}
@@ -77,6 +91,7 @@ export default function Requests() {
                   ) : <>Nessun orario preciso{r.preferences ? <> – preferenza: <b>{r.preferences}</b></> : ''}</>}
                 </div>
                 {r.notes && <div className="small muted">Note del paziente: {r.notes}</div>}
+                {r.status === 'CONFERMATA' && r.moveOf && <div className="small">Spostamento confermato: ora è {DateTime.fromISO(r.moveOf.start).toFormat("ccc d LLL 'alle' HH:mm")}</div>}
                 {r.status === 'CONFERMATA' && r.appointment && (
                   <div className="small">Confermata per {DateTime.fromISO(r.appointment.start).toFormat("ccc d LLL 'alle' HH:mm")}</div>
                 )}
@@ -117,7 +132,10 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
     .filter((l) => l.active || l.serviceId === Number(serviceId))
     .map((l) => ({ id: l.serviceId, name: l.name, category: l.category, durationMin: l.durationMin ?? l.defaultDurationMin })), [doctor, serviceId]);
   const svc = doctorServices.find((s) => s.id === Number(serviceId));
-  const duration = svc?.durationMin || 30;
+  const isMove = !!request.moveOf;
+  const moveDuration = isMove ? Math.round((new Date(request.moveOf.end) - new Date(request.moveOf.start)) / 60000) : null;
+  // per gli spostamenti resta la durata dell'appuntamento originale, se la prestazione non cambia
+  const duration = isMove && Number(serviceId || 0) === Number(request.moveOf.serviceId || 0) ? moveDuration : (svc?.durationMin || moveDuration || 30);
 
   useEffect(() => {
     if (!doctorId || !date) return;
@@ -126,14 +144,14 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
 
   async function confirm(force = false) {
     if (!time) { setErr('Scegli l\'orario'); return; }
-    if (!svc) { setErr('Scegli una prestazione erogata da questo medico'); return; }
+    if (!svc && !(isMove && !serviceId)) { setErr('Scegli una prestazione erogata da questo medico'); return; }
     setBusy(true);
     setErr(null);
     const start = DateTime.fromISO(`${date}T${time}`);
     try {
       const r = await api(`/requests/${request.id}/confirm`, {
         method: 'POST',
-        body: { doctorId: Number(doctorId), serviceId: Number(serviceId), start: start.toUTC().toISO(), end: start.plus({ minutes: duration }).toUTC().toISO(), notes: notes || null, force },
+        body: { doctorId: Number(doctorId), serviceId: serviceId ? Number(serviceId) : null, start: start.toUTC().toISO(), end: start.plus({ minutes: duration }).toUTC().toISO(), notes: notes || null, force },
       });
       setResult(r);
     } catch (e) {
@@ -149,7 +167,7 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
   if (result) {
     const a = result.appointment;
     return (
-      <Modal title="Prenotazione confermata" onClose={onDone}
+      <Modal title={result.moved ? 'Spostamento confermato' : 'Prenotazione confermata'} onClose={onDone}
         footer={<button className="btn btn-primary" onClick={onDone}>Fatto</button>}>
         <div className="form">
           <p><b>{a.patient.lastName} {a.patient.firstName}</b> – {a.service?.name} con {doctorName(a.doctor)}</p>
@@ -161,7 +179,7 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
           </p>
           <div className="row">
             <span>WhatsApp:</span>
-            <WhatsAppButton appointmentId={a.id} link={result.whatsapp} kind="CONFERMA" label="Invia conferma su WhatsApp" optIn={a.patient.whatsappOptIn} small={false} />
+            <WhatsAppButton appointmentId={a.id} link={result.whatsapp} kind={result.moved ? 'SPOSTAMENTO' : 'CONFERMA'} label={result.moved ? 'Avvisa dello spostamento su WhatsApp' : 'Invia conferma su WhatsApp'} optIn={a.patient.whatsappOptIn} small={false} />
           </div>
         </div>
       </Modal>
@@ -169,12 +187,13 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
   }
 
   return (
-    <Modal title={`Conferma la richiesta di ${request.lastName} ${request.firstName}`} onClose={onClose} wide
+    <Modal title={isMove ? `Sposta l'appuntamento di ${request.lastName} ${request.firstName}` : `Conferma la richiesta di ${request.lastName} ${request.firstName}`} onClose={onClose} wide
       footer={<>
         <button className="btn btn-ghost" onClick={onClose}>Annulla</button>
-        <button className="btn btn-primary" disabled={busy} onClick={() => confirm()}>{busy ? 'Conferma…' : 'Conferma e avvisa il paziente'}</button>
+        <button className="btn btn-primary" disabled={busy} onClick={() => confirm()}>{busy ? 'Conferma…' : isMove ? 'Sposta e avvisa il paziente' : 'Conferma e avvisa il paziente'}</button>
       </>}>
       <div className="form">
+        {isMove && <div className="notice small">Appuntamento attuale: <b>{DateTime.fromISO(request.moveOf.start).toFormat("cccc d LLLL 'alle' HH:mm")}</b>. Confermando, viene spostato al nuovo orario (stesso appuntamento, con il suo storico).</div>}
         <div className="muted small">
           {request.preferredStart
             ? <>Il paziente ha chiesto <b>{DateTime.fromISO(request.preferredStart).toFormat("cccc d LLLL 'alle' HH:mm")}</b>.</>
@@ -186,8 +205,8 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
             <DoctorSelect value={doctorId} onChange={setDoctorId} doctors={doctors.filter((d) => (d.active && !d.archivedAt) || d.id === request.doctorId)} />
           </label>
           <label>Prestazione
-            <select value={serviceId} onChange={(e) => setServiceId(Number(e.target.value))}>
-              {!svc && <option value={serviceId}>— scegli —</option>}
+            <select value={serviceId ?? ''} onChange={(e) => setServiceId(e.target.value ? Number(e.target.value) : null)}>
+              {!svc && <option value={serviceId ?? ''}>{isMove && !serviceId ? '— nessuna (come l\'appuntamento attuale) —' : '— scegli —'}</option>}
               {Object.entries(groupByCategory(doctorServices)).map(([cat, list]) => (
                 <optgroup key={cat} label={cat}>{list.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.durationMin} min)</option>)}</optgroup>
               ))}
@@ -210,5 +229,39 @@ function ConfirmModal({ request, doctors, onClose, onDone }) {
         {err && <div className="alert">{err}</div>}
       </div>
     </Modal>
+  );
+}
+
+/** Appuntamenti annullati dai pazienti dal link nel messaggio: la segreteria li vede, richiama o riempie il posto */
+function Cancellations({ onChanged }) {
+  const { data, reload } = useApi('/requests/cancellations');
+  const seen = async (id) => { await api(`/requests/cancellations/${id}/seen`, { method: 'POST' }); reload(); onChanged(); };
+  const seenAll = async () => { await api('/requests/cancellations/seen-all', { method: 'POST' }); reload(); onChanged(); };
+  if (!data) return <p className="muted">Caricamento…</p>;
+  if (!data.length) return <div className="empty">Nessun appuntamento annullato dai pazienti negli ultimi 60 giorni.</div>;
+  const unseen = data.filter((a) => !a.cancelSeenAt).length;
+  return (
+    <>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+        <span className="muted small">Annullati dal paziente con il link ricevuto nel messaggio: l'orario è tornato libero. Richiamali o usa il posto per un altro paziente.</span>
+        {unseen > 0 && <button className="btn btn-sm" onClick={seenAll}>Segna tutti come visti ({unseen})</button>}
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Annullato il</th><th>Appuntamento</th><th>Paziente</th><th>Motivo</th><th /></tr></thead>
+          <tbody>
+            {data.map((a) => (
+              <tr key={a.id} className={a.cancelSeenAt ? 'inactive' : ''}>
+                <td className="nowrap small">{a.cancelledAt ? fmtDateTime(a.cancelledAt) : '—'}</td>
+                <td><b>{DateTime.fromISO(a.start).toFormat("ccc d LLL 'alle' HH:mm")}</b><div className="small"><span className="dot" style={{ background: a.doctor.color }} /> {doctorName(a.doctor)} · {a.service?.name || 'Appuntamento'}</div></td>
+                <td>{a.patient.lastName} {a.patient.firstName}{a.patient.phone && <div className="small"><a href={`tel:${a.patient.phone.replace(/[^\d+]/g, '')}`}>{a.patient.phone}</a></div>}</td>
+                <td className="small">{a.cancelReason || <span className="muted">non indicato</span>}</td>
+                <td className="right">{a.cancelSeenAt ? <span className="muted small">visto</span> : <button className="btn btn-sm" onClick={() => seen(a.id)}>Visto</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-11-26",
+    "title": "Annullamenti e spostamenti dal link del paziente",
+    "items": [
+      "Lo studio viene avvisato quando un paziente annulla dal link: email e scheda «Annullati dai pazienti» nella pagina Richieste",
+      "Preavviso minimo per annullare o spostare online (24 ore, impostabile); sotto il limite il paziente è invitato a telefonare",
+      "Motivo dell'annullamento (facoltativo) salvato nell'appuntamento",
+      "«Chiedi di spostare»: il paziente sceglie un orario libero o scrive una preferenza; la segreteria conferma e l'appuntamento viene spostato"
+    ]
+  },
+  {
     "version": "1.13.2",
     "date": "2026-11-26",
     "title": "Promemoria WhatsApp più veloci",

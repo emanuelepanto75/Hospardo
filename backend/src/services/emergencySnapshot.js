@@ -73,7 +73,7 @@ async function buildSnapshotHtml(now = new Date()) {
     <table><thead><tr><th>Ricevuta</th><th>Paziente</th><th>Telefono</th><th>Prestazione</th><th>Medico</th><th>Orario richiesto</th></tr></thead><tbody>
     ${requests.map((r) => `<tr class="row"><td>${esc(DateTime.fromJSDate(r.createdAt).setZone(TZ).toFormat('dd/LL HH:mm'))}</td>`
       + `<td><b>${esc(r.lastName)} ${esc(r.firstName)}</b></td><td><a href="tel:${esc(r.phone.replace(/[^\d+]/g, ''))}">${esc(r.phone)}</a></td>`
-      + `<td>${esc(r.service.name)}</td><td>${esc(docName(r.doctor))}</td>`
+      + `<td>${esc(r.service?.name || '')}${r.moveOfId ? ' (spostamento)' : ''}</td><td>${esc(docName(r.doctor))}</td>`
       + `<td>${r.preferredStart ? esc(DateTime.fromJSDate(r.preferredStart).setZone(TZ).setLocale('it').toFormat("ccc d LLL 'alle' HH:mm")) : esc(r.preferences || 'nessuna preferenza')}</td></tr>`).join('')}
     </tbody></table></section>` : '';
 

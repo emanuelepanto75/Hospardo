@@ -234,8 +234,14 @@ model Appointment {
   confirmationSentAt DateTime?         @map("confirmation_sent_at")
   reminderSentAt     DateTime?         @map("reminder_sent_at")
   createdById        Int?              @map("created_by_id")
+  /// annullamento: quando, se dal paziente (link nel messaggio), motivo, e quando la segreteria l'ha visto
+  cancelledAt        DateTime?         @map("cancelled_at")
+  cancelledByPatient Boolean           @default(false) @map("cancelled_by_patient")
+  cancelReason       String?           @map("cancel_reason")
+  cancelSeenAt       DateTime?         @map("cancel_seen_at")
   notifications      Notification[]
-  request            BookingRequest?
+  request            BookingRequest?   @relation("RequestAppointment")
+  moveRequests       BookingRequest[]  @relation("MoveRequest")
   dentalTreatments   DentalTreatment[]
   planItems          TreatmentPlanItem[]
   createdAt          DateTime          @default(now()) @map("created_at")
@@ -270,8 +276,9 @@ model BookingRequest {
   status         RequestStatus @default(NUOVA)
   doctorId       Int           @map("doctor_id")
   doctor         Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  serviceId      Int           @map("service_id")
-  service        Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// null solo per gli spostamenti di appuntamenti senza prestazione
+  serviceId      Int?          @map("service_id")
+  service        Service?      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   /// orario scelto dal paziente (facoltativo): resta "tenuto" finché la richiesta è NUOVA
   preferredStart DateTime?     @map("preferred_start")
   preferredEnd   DateTime?     @map("preferred_end")
@@ -286,7 +293,10 @@ model BookingRequest {
   notes          String?
   whatsappOptIn  Boolean       @default(true) @map("whatsapp_opt_in")
   appointmentId  Int?          @unique @map("appointment_id")
-  appointment    Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  appointment    Appointment?  @relation("RequestAppointment", fields: [appointmentId], references: [id], onDelete: SetNull)
+  /// richiesta di spostamento di un appuntamento esistente (dal link nel messaggio al paziente)
+  moveOfId       Int?          @map("move_of_id")
+  moveOf         Appointment?  @relation("MoveRequest", fields: [moveOfId], references: [id], onDelete: Cascade)
   handledById    Int?          @map("handled_by_id")
   handledAt      DateTime?     @map("handled_at")
   rejectReason   String?       @map("reject_reason")

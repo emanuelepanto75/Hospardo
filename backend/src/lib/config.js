@@ -72,6 +72,8 @@ const config = {
   },
   /// Anticipo minimo (minuti) per prenotare online
   onlineMinLeadMin: Number(process.env.ONLINE_MIN_LEAD_MIN || 120),
+  // preavviso minimo (ore) perché il paziente possa annullare o chiedere di spostare dal link ricevuto
+  cancelMinHours: Number(process.env.CANCEL_MIN_HOURS ?? 24),
   /// Fino a quanti giorni avanti si può prenotare online
   onlineMaxDaysAhead: Number(process.env.ONLINE_MAX_DAYS_AHEAD || 90),
 };

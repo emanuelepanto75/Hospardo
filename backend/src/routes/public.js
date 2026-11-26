@@ -9,7 +9,7 @@ const config = require('../lib/config');
 const { ah, HttpError, notFound } = require('../lib/errors');
 const { getFreeSlots } = require('../services/availability');
 const { notifyAppointment } = require('../services/notify');
-const { sendRequestReceived, sendStudioAlert } = require('../services/requestMail');
+const { sendRequestReceived, sendStudioAlert, sendCancellationAlert } = require('../services/requestMail');
 const { effective } = require('../services/catalog');
 const { DateTime, TZ } = require('../lib/time');
 const { rateLimit } = require('../lib/rateLimit');
@@ -174,29 +174,116 @@ async function byToken(token) {
   return appt;
 }
 
-const publicView = (a) => ({
-  start: a.start,
-  end: a.end,
-  status: a.status,
-  service: a.service?.name ?? null,
-  doctor: [a.doctor.title, a.doctor.firstName, a.doctor.lastName].filter(Boolean).join(' '),
-  patient: `${a.patient.firstName} ${a.patient.lastName}`,
-  canCancel: ['PRENOTATO', 'CONFERMATO'].includes(a.status) && a.start > new Date(),
-  clinic: config.clinic,
-});
+/** Il paziente può annullare o chiedere di spostare fino a CANCEL_MIN_HOURS ore prima */
+function deadlineOf(a) {
+  return new Date(a.start.getTime() - config.cancelMinHours * 3600000);
+}
 
-router.get('/appointment/:token', ah(async (req, res) => res.json(publicView(await byToken(req.params.token)))));
+const publicView = (a, extra = {}) => {
+  const active = ['PRENOTATO', 'CONFERMATO'].includes(a.status) && a.start > new Date();
+  const inTime = new Date() < deadlineOf(a);
+  return {
+    start: a.start,
+    end: a.end,
+    status: a.status,
+    service: a.service?.name ?? null,
+    doctor: [a.doctor.title, a.doctor.firstName, a.doctor.lastName].filter(Boolean).join(' '),
+    patient: `${a.patient.firstName} ${a.patient.lastName}`,
+    canCancel: active && inTime,
+    canMove: active && inTime && !extra.pendingMove,
+    // troppo tardi per farlo online: il paziente deve telefonare
+    tooLate: active && !inTime,
+    minHours: config.cancelMinHours,
+    pendingMove: extra.pendingMove || null,
+    cancelledByPatient: a.cancelledByPatient,
+    clinic: config.clinic,
+  };
+};
+
+async function pendingMoveOf(appt) {
+  const r = await prisma.bookingRequest.findFirst({ where: { moveOfId: appt.id, status: 'NUOVA' }, orderBy: { createdAt: 'desc' } });
+  return r ? { createdAt: r.createdAt, preferredStart: r.preferredStart, preferences: r.preferences } : null;
+}
+const viewOf = async (appt) => publicView(appt, { pendingMove: await pendingMoveOf(appt) });
+
+router.get('/appointment/:token', ah(async (req, res) => res.json(await viewOf(await byToken(req.params.token)))));
 
 router.post('/appointment/:token/cancel', rateLimit({ max: 20, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
+  const { reason } = z.object({ reason: z.preprocess(emptyToUndef, z.string().trim().max(300).optional()) }).parse(req.body || {});
   const appt = await byToken(req.params.token);
-  if (!publicView(appt).canCancel) throw new HttpError(400, 'Questo appuntamento non può essere annullato online');
-  const updated = await prisma.appointment.update({
-    where: { id: appt.id },
-    data: { status: 'ANNULLATO', notes: [appt.notes, '[Annullato dal paziente online]'].filter(Boolean).join('\n') },
-    include: { patient: true, doctor: true, service: true },
+  const view = publicView(appt);
+  if (view.tooLate) throw new HttpError(400, `Mancano meno di ${config.cancelMinHours} ore: per annullare chiami lo studio${config.clinic.phone ? ` allo ${config.clinic.phone}` : ''}`);
+  if (!view.canCancel) throw new HttpError(400, 'Questo appuntamento non può essere annullato online');
+  const updated = await prisma.$transaction(async (tx) => {
+    // una richiesta di spostamento ancora aperta non serve più
+    await tx.bookingRequest.updateMany({ where: { moveOfId: appt.id, status: 'NUOVA' }, data: { status: 'RIFIUTATA', rejectReason: 'Appuntamento annullato dal paziente', handledAt: new Date() } });
+    return tx.appointment.update({
+      where: { id: appt.id },
+      data: {
+        status: 'ANNULLATO', cancelledAt: new Date(), cancelledByPatient: true, cancelReason: reason || null,
+        notes: [appt.notes, `[Annullato dal paziente online${reason ? `: ${reason}` : ''}]`].filter(Boolean).join('\n'),
+      },
+      include: { patient: true, doctor: true, service: true },
+    });
   });
-  await notifyAppointment(updated, 'ANNULLAMENTO');
-  res.json(publicView(updated));
+  await Promise.all([notifyAppointment(updated, 'ANNULLAMENTO'), sendCancellationAlert(updated, reason)]);
+  res.json(await viewOf(updated));
 }));
 
+/** Orari liberi per lo spostamento: stesso medico, stessa durata dell'appuntamento */
+router.get('/appointment/:token/slots', ah(async (req, res) => {
+  const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(req.query);
+  const appt = await byToken(req.params.token);
+  if (!publicView(appt).canMove) return res.json([]);
+  const { notBefore, lastDay } = bookingWindow();
+  if (date > lastDay) return res.json([]);
+  const durationMin = Math.round((appt.end - appt.start) / 60000);
+  const slots = await getFreeSlots({ doctorId: appt.doctorId, date, durationMin, notBefore, holds: true });
+  res.json(slots.map((s) => s.start));
+}));
+
+/** Richiesta di spostamento: l'appuntamento resta valido finché la segreteria non conferma il nuovo orario */
+router.post('/appointment/:token/move', rateLimit({ max: 10, windowMs: 60 * 60 * 1000 }), ah(async (req, res) => {
+  const data = z.object({
+    start: z.preprocess(emptyToUndef, z.coerce.date().optional()),
+    preferences: z.preprocess(emptyToUndef, z.string().trim().max(300).optional()),
+    notes: z.preprocess(emptyToUndef, z.string().trim().max(500).optional()),
+  }).refine((d) => d.start || d.preferences, { message: 'Scegli un orario libero oppure scrivi quando preferisci' }).parse(req.body || {});
+  const appt = await byToken(req.params.token);
+  const view = await viewOf(appt);
+  if (view.pendingMove) throw new HttpError(409, 'Ha già chiesto uno spostamento: la contatteremo a breve');
+  if (view.tooLate) throw new HttpError(400, `Mancano meno di ${config.cancelMinHours} ore: per spostare l'appuntamento chiami lo studio${config.clinic.phone ? ` allo ${config.clinic.phone}` : ''}`);
+  if (!view.canMove) throw new HttpError(400, 'Questo appuntamento non può essere spostato online');
+  const durationMin = Math.round((appt.end - appt.start) / 60000);
+  let preferredEnd = null;
+  if (data.start) {
+    const { notBefore } = bookingWindow();
+    const date = DateTime.fromJSDate(data.start).setZone(TZ).toISODate();
+    const slots = await getFreeSlots({ doctorId: appt.doctorId, date, durationMin, notBefore, holds: true });
+    if (!slots.some((x) => +x.start === +data.start)) throw new HttpError(409, 'L\'orario scelto non è più disponibile: scegline un altro');
+    preferredEnd = new Date(data.start.getTime() + durationMin * 60000);
+  }
+  const p = appt.patient;
+  const request = await prisma.bookingRequest.create({
+    data: {
+      moveOfId: appt.id,
+      doctorId: appt.doctorId,
+      serviceId: appt.serviceId ?? null,
+      preferredStart: data.start ?? null,
+      preferredEnd,
+      preferences: data.preferences ?? null,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      email: p.email || '',
+      phone: p.phone || '',
+      fiscalCode: p.fiscalCode,
+      birthDate: p.birthDate,
+      notes: data.notes ?? null,
+      whatsappOptIn: p.whatsappOptIn,
+    },
+    include: { doctor: true, service: true, moveOf: true },
+  });
+  await Promise.all([sendRequestReceived(request), sendStudioAlert(request)]);
+  res.status(201).json(await viewOf(appt));
+}));
 module.exports = router;

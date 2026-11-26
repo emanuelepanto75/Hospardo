@@ -14,7 +14,7 @@ export default function Layout() {
   const [pending, setPending] = useState(0);
   useEffect(() => {
     if (!canHandleRequests) return undefined;
-    const load = () => api('/requests/count').then((r) => setPending(r.count)).catch(() => {});
+    const load = () => api('/requests/count').then((r) => setPending(r.count + (r.cancellations || 0))).catch(() => {});
     load();
     const t = setInterval(load, 60000);
     window.addEventListener('hospardo:requests', load);
