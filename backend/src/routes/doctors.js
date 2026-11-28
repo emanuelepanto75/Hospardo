@@ -1,0 +1,294 @@
+const router = require('express').Router();
+const { z } = require('zod');
+const prisma = require('../lib/prisma');
+const { ah, HttpError, notFound } = require('../lib/errors');
+const { requireRole, isAdmin } = require('../middleware/auth');
+const { hmToMin, DateTime, TZ, dayBounds, localToDate } = require('../lib/time');
+const { dateOnly } = require('../lib/schedule');
+
+const doctorSchema = z.object({
+  firstName: z.string().trim(),
+  lastName: z.string().min(1),
+  title: z.string().optional(),
+  specialty: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional().or(z.literal('').transform(() => null)),
+  phone: z.string().nullable().optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  bio: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+  bookableOnline: z.boolean().optional(),
+  slotStepMin: z.number().int().min(5).max(120).optional(),
+  isDentist: z.boolean().optional(),
+  serviceIds: z.array(z.number().int()).optional(),
+});
+
+const include = {
+  services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },
+  workingHours: { orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] },
+  // eccezioni recenti e future (per agenda e scheda medico): calcolate a ogni richiesta
+  get scheduleExceptions() {
+    return { where: { date: { gte: new Date(Date.now() - 120 * 86400000) } }, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] };
+  },
+};
+const out = (d) => ({
+  ...d,
+  serviceIds: d.services.map((s) => s.serviceId),
+  services: d.services.map((s) => ({
+    serviceId: s.serviceId,
+    name: s.service.name,
+    category: s.service.category,
+    active: s.service.active,
+    // valori personalizzati per il medico (null = standard)
+    durationMin: s.durationMin,
+    priceCents: s.priceCents,
+    bookableOnline: s.bookableOnline,
+    // valori standard della prestazione
+    defaultDurationMin: s.service.durationMin,
+    defaultPriceCents: s.service.priceCents,
+    serviceBookableOnline: s.service.bookableOnline,
+  })),
+});
+
+/** Il medico può modificare solo i propri orari/assenze; admin e segreteria tutti */
+function canManageDoctor(user, doctorId) {
+  return isAdmin(user) || user.role === 'SEGRETERIA' || user.doctorId === doctorId;
+}
+
+/** Aggiorna l'elenco delle prestazioni di un medico mantenendo le personalizzazioni esistenti */
+async function syncDoctorServices(tx, doctorId, serviceIds) {
+  await tx.doctorService.deleteMany({ where: { doctorId, serviceId: { notIn: serviceIds } } });
+  await tx.doctorService.createMany({ data: serviceIds.map((serviceId) => ({ doctorId, serviceId })), skipDuplicates: true });
+}
+
+const ACTIVE_FUTURE = (doctorId) => ({ doctorId, status: { in: ['PRENOTATO', 'CONFERMATO', 'IN_ATTESA'] }, start: { gte: new Date() } });
+
+router.get('/', ah(async (req, res) => {
+  const doctors = await prisma.doctor.findMany({ orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }], include });
+  res.json(doctors.map(out));
+}));
+
+/** Assenze di tutti i medici in un intervallo (per l'agenda) */
+router.get('/time-off', ah(async (req, res) => {
+  const { from, to } = z.object({ from: z.coerce.date(), to: z.coerce.date() }).parse(req.query);
+  res.json(await prisma.timeOff.findMany({ where: { start: { lt: to }, end: { gt: from } }, orderBy: { start: 'asc' } }));
+}));
+
+router.get('/:id', ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const doctor = await prisma.doctor.findUnique({ where: { id }, include });
+  if (!doctor) throw notFound('Medico');
+  const [appointmentsTotal, futureAppointments] = await Promise.all([
+    prisma.appointment.count({ where: { doctorId: id } }),
+    prisma.appointment.count({ where: ACTIVE_FUTURE(id) }),
+  ]);
+  res.json({ ...out(doctor), appointmentsTotal, futureAppointments });
+}));
+
+router.post('/', requireRole('ADMIN'), ah(async (req, res) => {
+  const { serviceIds = [], ...data } = doctorSchema.parse(req.body);
+  const doctor = await prisma.doctor.create({
+    data: { ...data, services: { create: serviceIds.map((serviceId) => ({ serviceId })) } },
+    include,
+  });
+  res.status(201).json(out(doctor));
+}));
+
+router.put('/:id', requireRole('ADMIN'), ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const { serviceIds, ...data } = doctorSchema.partial().parse(req.body);
+  const doctor = await prisma.$transaction(async (tx) => {
+    if (serviceIds) await syncDoctorServices(tx, id, serviceIds);
+    return tx.doctor.update({ where: { id }, data, include });
+  });
+  res.json(out(doctor));
+}));
+
+// ---- Prestazioni erogate dal medico (con durata/prezzo personalizzati) ----
+const doctorServicesSchema = z.array(z.object({
+  serviceId: z.number().int(),
+  durationMin: z.number().int().min(5).max(480).nullable().optional(),
+  priceCents: z.number().int().min(0).nullable().optional(),
+  bookableOnline: z.boolean().optional(),
+}));
+
+router.put('/:id/services', requireRole('ADMIN'), ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  const items = doctorServicesSchema.parse(req.body);
+  if (new Set(items.map((i) => i.serviceId)).size !== items.length) throw new HttpError(400, 'Prestazione ripetuta');
+  await prisma.$transaction(async (tx) => {
+    await tx.doctorService.deleteMany({ where: { doctorId, serviceId: { notIn: items.map((i) => i.serviceId) } } });
+    for (const i of items) {
+      const values = { durationMin: i.durationMin ?? null, priceCents: i.priceCents ?? null, bookableOnline: i.bookableOnline ?? true };
+      await tx.doctorService.upsert({
+        where: { doctorId_serviceId: { doctorId, serviceId: i.serviceId } },
+        update: values,
+        create: { doctorId, serviceId: i.serviceId, ...values },
+      });
+    }
+  });
+  const doctor = await prisma.doctor.findUnique({ where: { id: doctorId }, include });
+  res.json(out(doctor));
+}));
+
+// ---- Medico che non presta più servizio ----
+
+/** Archivia: il medico sparisce da agenda e prenotazioni online, lo storico resta */
+router.post('/:id/archive', requireRole('ADMIN'), ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const { cancelFuture } = z.object({ cancelFuture: z.boolean().optional() }).parse(req.body || {});
+  const future = await prisma.appointment.findMany({ where: ACTIVE_FUTURE(id), select: { id: true } });
+  if (future.length && !cancelFuture) {
+    throw new HttpError(409, `Il medico ha ancora ${future.length} appuntamenti futuri: spostali o annullali prima di archiviarlo`, { futureAppointments: future.length });
+  }
+  await prisma.$transaction([
+    prisma.appointment.updateMany({ where: { id: { in: future.map((f) => f.id) } }, data: { status: 'ANNULLATO' } }),
+    prisma.doctor.update({ where: { id }, data: { active: false, bookableOnline: false, archivedAt: new Date() } }),
+    // l'eventuale account del medico non può più accedere
+    prisma.user.updateMany({ where: { doctorId: id }, data: { active: false } }),
+  ]);
+  // avvisa i pazienti degli appuntamenti annullati
+  const { notifyAppointment } = require('../services/notify');
+  for (const f of future) await notifyAppointment(f.id, 'ANNULLAMENTO');
+  const doctor = await prisma.doctor.findUnique({ where: { id }, include });
+  res.json({ ...out(doctor), cancelledAppointments: future.length });
+}));
+
+router.post('/:id/restore', requireRole('ADMIN'), ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const doctor = await prisma.doctor.update({ where: { id }, data: { active: true, bookableOnline: true, archivedAt: null }, include });
+  res.json(out(doctor));
+}));
+
+/** Eliminazione definitiva: consentita solo se il medico non ha mai avuto appuntamenti */
+/**
+ * Eliminazione definitiva. Senza appuntamenti: consentita agli amministratori.
+ * Con appuntamenti (es. medici di prova): solo l'amministratore principale, solo per medici
+ * disattivati o archiviati, e confermando con il cognome (`confirm`). Cancella anche i loro appuntamenti.
+ */
+router.delete('/:id', requireRole('ADMIN'), ah(async (req, res) => {
+  const id = Number(req.params.id);
+  const doctor = await prisma.doctor.findUnique({ where: { id } });
+  if (!doctor) throw notFound('Medico');
+  const count = await prisma.appointment.count({ where: { doctorId: id } });
+  if (count) {
+    if (req.query.withHistory !== '1') {
+      throw new HttpError(409, `Il medico ha ${count} appuntamenti nello storico: non può essere eliminato, ma puoi archiviarlo`);
+    }
+    if (req.user.role !== 'SUPERADMIN') throw new HttpError(403, 'Solo l\'amministratore principale può eliminare un medico con il suo storico');
+    if (doctor.active && !doctor.archivedAt) throw new HttpError(400, 'Archivia o disattiva il medico prima di eliminarlo');
+    if (String(req.query.confirm || '').trim().toLowerCase() !== doctor.lastName.trim().toLowerCase()) {
+      throw new HttpError(400, 'Conferma non valida: scrivi il cognome del medico');
+    }
+  }
+  await prisma.$transaction([
+    // le notifiche degli appuntamenti si cancellano a cascata
+    prisma.appointment.deleteMany({ where: { doctorId: id } }),
+    prisma.user.updateMany({ where: { doctorId: id }, data: { doctorId: null, active: false } }),
+    prisma.doctor.delete({ where: { id } }),
+  ]);
+  res.json({ deletedAppointments: count });
+}));
+
+// ---- Orari settimanali ----
+const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato orario HH:mm');
+const hoursSchema = z.array(z.object({ weekday: z.number().int().min(1).max(7), startTime: hm, endTime: hm }));
+
+router.put('/:id/hours', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const hours = hoursSchema.parse(req.body);
+  for (const h of hours) {
+    if (hmToMin(h.endTime) <= hmToMin(h.startTime)) throw new HttpError(400, `Fascia non valida: ${h.startTime}-${h.endTime}`);
+  }
+  // controlla sovrapposizioni tra fasce dello stesso giorno
+  for (let d = 1; d <= 7; d++) {
+    const day = hours.filter((h) => h.weekday === d).sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
+    for (let i = 1; i < day.length; i++) {
+      if (hmToMin(day[i].startTime) < hmToMin(day[i - 1].endTime)) throw new HttpError(400, 'Fasce orarie sovrapposte');
+    }
+  }
+  await prisma.$transaction([
+    prisma.workingHours.deleteMany({ where: { doctorId } }),
+    prisma.workingHours.createMany({ data: hours.map((h) => ({ ...h, doctorId })) }),
+  ]);
+  const saved = await prisma.workingHours.findMany({ where: { doctorId }, orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] });
+  res.json(saved);
+}));
+
+// ---- Eccezioni all'orario (giorni con orario diverso da quello abituale) ----
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida');
+
+router.get('/:id/exceptions', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  const from = isoDay.optional().parse(req.query.from) || DateTime.now().setZone(TZ).minus({ days: 30 }).toISODate();
+  const rows = await prisma.scheduleException.findMany({ where: { doctorId, date: { gte: dateOnly(from) } }, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] });
+  res.json(rows);
+}));
+
+/** Imposta le fasce di una data (sostituisce quelle già impostate per quella data) */
+router.put('/:id/exceptions/:date', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const date = isoDay.parse(req.params.date);
+  const { blocks, note } = z.object({
+    blocks: z.array(z.object({ startTime: hm, endTime: hm })).min(1, 'Indica almeno una fascia oraria').max(6),
+    note: z.string().trim().max(200).nullable().optional(),
+  }).parse(req.body);
+  const sorted = [...blocks].sort((a, b) => hmToMin(a.startTime) - hmToMin(b.startTime));
+  for (const [i, b] of sorted.entries()) {
+    if (hmToMin(b.endTime) <= hmToMin(b.startTime)) throw new HttpError(400, `Fascia non valida: ${b.startTime}-${b.endTime}`);
+    if (i && hmToMin(b.startTime) < hmToMin(sorted[i - 1].endTime)) throw new HttpError(400, 'Fasce orarie sovrapposte');
+  }
+  await prisma.$transaction([
+    prisma.scheduleException.deleteMany({ where: { doctorId, date: dateOnly(date) } }),
+    prisma.scheduleException.createMany({ data: sorted.map((b) => ({ doctorId, date: dateOnly(date), ...b, note: note || null })) }),
+  ]);
+  // appuntamenti di quel giorno che restano fuori dal nuovo orario
+  const { start, end } = dayBounds(date);
+  const appts = await prisma.appointment.findMany({ where: { doctorId, status: { in: ['PRENOTATO', 'CONFERMATO'] }, start: { gte: start, lt: end } } });
+  const outside = appts.filter((a) => !sorted.some((b) => a.start >= localToDate(date, b.startTime) && a.end <= localToDate(date, b.endTime))).length;
+  res.json({ date, blocks: sorted, outsideAppointments: outside });
+}));
+
+router.delete('/:id/exceptions/:date', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const date = isoDay.parse(req.params.date);
+  await prisma.scheduleException.deleteMany({ where: { doctorId, date: dateOnly(date) } });
+  res.status(204).end();
+}));
+
+// ---- Assenze / ferie ----
+const timeOffSchema = z.object({
+  start: z.coerce.date(),
+  end: z.coerce.date(),
+  reason: z.string().nullable().optional(),
+}).refine((t) => t.end > t.start, { message: 'La fine deve essere successiva all\'inizio', path: ['end'] });
+
+router.get('/:id/time-off', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 86400000);
+  const items = await prisma.timeOff.findMany({ where: { doctorId, end: { gte: from } }, orderBy: { start: 'asc' } });
+  res.json(items);
+}));
+
+router.post('/:id/time-off', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  const data = timeOffSchema.parse(req.body);
+  const item = await prisma.timeOff.create({ data: { ...data, doctorId } });
+  // segnala gli appuntamenti già presenti nel periodo
+  const conflicts = await prisma.appointment.count({
+    where: { doctorId, status: { in: ['PRENOTATO', 'CONFERMATO'] }, start: { lt: data.end }, end: { gt: data.start } },
+  });
+  res.status(201).json({ ...item, conflictingAppointments: conflicts });
+}));
+
+router.delete('/:id/time-off/:timeOffId', ah(async (req, res) => {
+  const doctorId = Number(req.params.id);
+  if (!canManageDoctor(req.user, doctorId)) throw new HttpError(403, 'Permessi insufficienti');
+  await prisma.timeOff.deleteMany({ where: { id: Number(req.params.timeOffId), doctorId } });
+  res.status(204).end();
+}));
+
+module.exports = router;

@@ -1,0 +1,147 @@
+[
+  {
+    "version": "1.14.0",
+    "date": "2026-11-26",
+    "title": "Annullamenti e spostamenti dal link del paziente",
+    "items": [
+      "Lo studio viene avvisato quando un paziente annulla dal link: email e scheda «Annullati dai pazienti» nella pagina Richieste",
+      "Preavviso minimo per annullare o spostare online (24 ore, impostabile); sotto il limite il paziente è invitato a telefonare",
+      "Motivo dell'annullamento (facoltativo) salvato nell'appuntamento",
+      "«Chiedi di spostare»: il paziente sceglie un orario libero o scrive una preferenza; la segreteria conferma e l'appuntamento viene spostato"
+    ]
+  },
+  {
+    "version": "1.13.2",
+    "date": "2026-11-26",
+    "title": "Promemoria WhatsApp più veloci",
+    "items": [
+      "Invio dei promemoria in sequenza: un paziente dopo l'altro con il solo tasto Invio",
+      "WhatsApp si apre direttamente nell'app del PC (predefinito), senza la pagina di anteprima; WhatsApp Web riusa sempre la stessa scheda"
+    ]
+  },
+  {
+    "version": "1.13.1",
+    "date": "2026-11-26",
+    "title": "PDF nel promemoria ai medici",
+    "items": [
+      "Promemoria ai medici con il PDF della giornata: allegato all'email, scaricabile e da trascinare nella chat WhatsApp"
+    ]
+  },
+  {
+    "version": "1.13.0",
+    "date": "2026-11-26",
+    "title": "Promemoria ai medici e ricerca del medico",
+    "items": [
+      "Promemoria ai medici: per ognuno la prima data utile con appuntamenti, elenco via email o WhatsApp (Promemoria → Medici)",
+      "Scelta del medico scrivendo le prime lettere del cognome, del nome o della specializzazione (appuntamento, richieste, agenda)"
+    ]
+  },
+  {
+    "version": "1.12.0",
+    "date": "2026-11-26",
+    "title": "Pazienti, orari e magazzino",
+    "items": [
+      "Eccezioni all'orario dei medici: giorni o settimane con orari diversi (in agenda in verde chiaro)",
+      "Materiali delle cure da confermare a fine giornata dal dentista (Magazzino → Da confermare)",
+      "Luogo di nascita e calcolo automatico del codice fiscale; iniziali maiuscole automatiche",
+      "Informativa privacy (hospardo.it/privacy) nel modulo di prenotazione e stampabile",
+      "Eliminazione dei pazienti per gli amministratori",
+      "Nell'appuntamento: chi l'ha preso e quando",
+      "Menu a sinistra riducibile alle icone; WhatsApp Business (app o WhatsApp Web)",
+      "Numero di versione e pagina Novità"
+    ]
+  },
+  {
+    "version": "1.11.0",
+    "date": "2026-11-26",
+    "title": "Magazzino odontoiatrico",
+    "items": [
+      "Articoli, carichi, scarichi e rettifiche con lettore di codici a barre (EAN e GS1)",
+      "Lotti e scadenze, tracciabilità degli impianti su paziente e dente",
+      "Materiali per prestazione"
+    ]
+  },
+  {
+    "version": "1.10.0",
+    "date": "2026-11-26",
+    "title": "Piani di cura e preventivi",
+    "items": [
+      "Piani di cura con preventivo PDF numerato e firma di accettazione",
+      "Prenotazione delle sedute dalle voci del piano, voci eseguite registrate nel diario",
+      "Cartella dentale attivabile su richiesta per ogni paziente"
+    ]
+  },
+  {
+    "version": "1.9.0",
+    "date": "2026-11-25",
+    "title": "Cartella dentale",
+    "items": [
+      "Odontogramma con stato di denti e superfici",
+      "Diario dei trattamenti collegato agli appuntamenti"
+    ]
+  },
+  {
+    "version": "1.8.0",
+    "date": "2026-11-25",
+    "title": "Copia di emergenza",
+    "items": [
+      "Agenda consultabile in sola lettura sui PC dello studio anche senza internet"
+    ]
+  },
+  {
+    "version": "1.7.0",
+    "date": "2026-11-24",
+    "title": "Richieste di prenotazione dal sito",
+    "items": [
+      "Le prenotazioni dal sito diventano richieste confermate dalla segreteria",
+      "Agenda del giorno con i soli medici che hanno appuntamenti; stampa del giorno o della settimana",
+      "Prezzi e durate nascondibili sul sito"
+    ]
+  },
+  {
+    "version": "1.6.0",
+    "date": "2026-11-23",
+    "title": "Tariffario e stampe",
+    "items": [
+      "Importazione del tariffario (medici, prestazioni, durate, tariffe)",
+      "Stampa settimanale del singolo medico in PDF"
+    ]
+  },
+  {
+    "version": "1.5.0",
+    "date": "2026-11-23",
+    "title": "Sito e ruoli",
+    "items": [
+      "Sito pubblico hospardo.it e agenda su app.hospardo.it",
+      "Ruoli: amministratore principale, amministratore, segreteria, medico"
+    ]
+  },
+  {
+    "version": "1.4.0",
+    "date": "2026-11-17",
+    "title": "WhatsApp e riepilogo serale",
+    "items": [
+      "WhatsApp con un clic e pagina Promemoria",
+      "Email serale con Excel e calendario dei prossimi giorni",
+      "Backup automatico notturno"
+    ]
+  },
+  {
+    "version": "1.3.0",
+    "date": "2026-11-16",
+    "title": "Prestazioni per medico e messaggi",
+    "items": [
+      "Prestazioni, durate e prezzi per medico; archiviazione dei medici",
+      "Email di conferma, promemoria, spostamento e annullamento",
+      "Avvio con Docker"
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-11-12",
+    "title": "Prima versione",
+    "items": [
+      "Agenda multi-medico, pazienti, prestazioni, orari e assenze"
+    ]
+  }
+]

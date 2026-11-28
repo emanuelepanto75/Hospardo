@@ -1,0 +1,90 @@
+# Hospardo: database + agenda.
+# Avvio (e aggiornamento dopo un git pull):  docker compose up -d --build
+# Entrambi ripartono da soli se si bloccano o al riavvio di Docker.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hospardo
+    # raggiungibile solo da questo PC (per strumenti come prisma studio)
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hospardo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    # inoltra correttamente i segnali di arresto al server (stop immediato)
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # dentro Docker il database si chiama "db", non "localhost"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/hospardo?schema=public
+      PORT: "4100"
+    volumes:
+      # la configurazione resta sul PC, in backend/.env (creala prima da backend/.env.example)
+      - ./backend/.env:/app/backend/.env
+    ports:
+      - "${HOSPARDO_PORT:-4100}:4100"
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+      TZ: Europe/Rome
+      BACKUP_TIME: ${BACKUP_TIME:-02:30}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      # cartella del PC dove finiscono i backup (modificabile con BACKUP_DIR nel file .env principale)
+      - ${BACKUP_DIR:-./backups}:/backups
+    entrypoint: ["sh", "/backup.sh"]
+
+  # Smista pagina web (DOMINIO) e agenda (app.DOMINIO); anteprima su http://localhost:4180
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      HOSPARDO_DOMAIN: ${HOSPARDO_DOMAIN:-hospardo.local}
+    ports:
+      - "127.0.0.1:${HOSPARDO_SITE_PORT:-4180}:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/sito:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Tunnel Cloudflare dedicato a Hospardo: pubblica pagina e agenda senza aprire porte sul router.
+  # Si attiva con COMPOSE_PROFILES=tunnel e CLOUDFLARE_TUNNEL_TOKEN nel file .env principale.
+  # Vedi docs/PUBBLICAZIONE.md.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    depends_on:
+      - caddy
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

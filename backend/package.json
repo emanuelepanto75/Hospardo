@@ -1,0 +1,37 @@
+{
+  "name": "hospardo-backend",
+  "version": "1.14.0",
+  "private": true,
+  "description": "Hospardo – API agenda studio medico (Express + Prisma + PostgreSQL)",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:seed": "node prisma/seed.js",
+    "setup": "node scripts/setup.js",
+    "report:send": "node scripts/send-report.js",
+    "import:tariffario": "node scripts/import-tariffario.js",
+    "email:test": "node scripts/test-email.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.5.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
+    "pdfkit": "^0.15.1",
+    "prisma": "^5.22.0",
+    "zod": "^3.23.8"
+  }
+}

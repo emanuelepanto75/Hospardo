@@ -1,0 +1,46 @@
+const jwt = require('jsonwebtoken');
+const config = require('../lib/config');
+const prisma = require('../lib/prisma');
+const { HttpError } = require('../lib/errors');
+
+async function requireAuth(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) throw new HttpError(401, 'Accesso richiesto');
+    let payload;
+    try {
+      payload = jwt.verify(token, config.jwtSecret);
+    } catch {
+      throw new HttpError(401, 'Sessione scaduta, effettua di nuovo l\'accesso');
+    }
+    const user = await prisma.user.findUnique({ where: { id: payload.sub }, include: { doctor: { select: { isDentist: true, active: true } } } });
+    if (!user || !user.active) throw new HttpError(401, 'Utente non attivo');
+    req.user = user;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
+const isAdmin = (user) => !!user && ADMIN_ROLES.includes(user.role);
+/** Accesso alla cartella dentale: amministratori e medici odontoiatri (l'utente deve includere `doctor`) */
+const canDental = (user) => isAdmin(user) || (user?.role === 'MEDICO' && !!user.doctor?.isDentist);
+/** piani di cura e preventivi: anche la segreteria */
+const canPlans = (user) => canDental(user) || user?.role === 'SEGRETERIA';
+
+/** Ruoli ammessi. 'ADMIN' comprende anche l'amministratore principale (SUPERADMIN). */
+const requireRole = (...roles) => {
+  const allowed = roles.includes('ADMIN') ? [...roles, 'SUPERADMIN'] : roles;
+  return (req, res, next) => {
+    if (!req.user || !allowed.includes(req.user.role)) return next(new HttpError(403, 'Permessi insufficienti'));
+    next();
+  };
+};
+
+function signToken(user) {
+  return jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
+}
+
+module.exports = { requireAuth, requireRole, signToken, isAdmin, canDental, canPlans, ADMIN_ROLES };

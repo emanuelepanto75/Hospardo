@@ -1,0 +1,2 @@
+# gli script eseguiti nei container Linux devono avere fine riga LF anche su Windows
+*.sh text eol=lf

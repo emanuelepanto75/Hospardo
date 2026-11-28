@@ -1,0 +1,589 @@
+// Hospardo – schema dati dell'agenda dello studio medico
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERADMIN // amministratore principale: unico che gestisce gli altri amministratori
+  ADMIN      // amministratore di secondo livello
+  SEGRETERIA
+  MEDICO
+}
+
+enum AppointmentStatus {
+  PRENOTATO
+  CONFERMATO
+  IN_ATTESA // paziente arrivato in sala d'attesa
+  COMPLETATO
+  ANNULLATO
+  NON_PRESENTATO
+}
+
+enum RequestStatus {
+  NUOVA      // in attesa che lo studio la gestisca
+  CONFERMATA // trasformata in appuntamento
+  RIFIUTATA
+}
+
+enum AppointmentSource {
+  INTERNO
+  ONLINE
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationKind {
+  CONFERMA
+  PROMEMORIA
+  ANNULLAMENTO
+  SPOSTAMENTO
+}
+
+enum NotificationStatus {
+  INVIATO
+  SIMULATO // canale non configurato: messaggio solo registrato nel log
+  ERRORE
+  MANUALE // WhatsApp aperto con un clic dalla segreteria (invio confermato dall'operatore)
+}
+
+/// Utente che accede al gestionale (segreteria, medici, amministratori)
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         Role     @default(SEGRETERIA)
+  active       Boolean  @default(true)
+  doctorId     Int?     @unique @map("doctor_id")
+  doctor       Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Doctor {
+  id            Int            @id @default(autoincrement())
+  firstName     String         @map("first_name")
+  lastName      String         @map("last_name")
+  title         String         @default("Dott.")
+  specialty     String?
+  email         String?
+  phone         String?
+  color         String         @default("#2563eb")
+  bio           String?
+  active        Boolean        @default(true)
+  /// Data di archiviazione (medico che non presta più servizio)
+  archivedAt    DateTime?      @map("archived_at")
+  bookableOnline Boolean       @default(true) @map("bookable_online")
+  /// Granularità degli slot proposti (minuti)
+  slotStepMin   Int            @default(15) @map("slot_step_min")
+  /// odontoiatra: accede alla cartella dentale dei pazienti
+  isDentist     Boolean        @default(false) @map("is_dentist")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  user          User?
+  services      DoctorService[]
+  workingHours  WorkingHours[]
+  timeOff       TimeOff[]
+  scheduleExceptions ScheduleException[]
+  appointments  Appointment[]
+  requests      BookingRequest[]
+  dentalTreatments DentalTreatment[]
+  treatmentPlans TreatmentPlan[]
+  stockDrafts    StockUnloadDraft[]
+  reminders      DoctorReminder[]
+
+  @@map("doctors")
+}
+
+/// Prestazione erogata dallo studio (visita, ecografia, ...)
+model Service {
+  id             Int             @id @default(autoincrement())
+  name           String
+  category       String?
+  description    String?
+  durationMin    Int             @map("duration_min")
+  priceCents     Int?            @map("price_cents")
+  color          String?
+  bookableOnline Boolean         @default(true) @map("bookable_online")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  doctors        DoctorService[]
+  appointments   Appointment[]
+  requests       BookingRequest[]
+  dentalTreatments DentalTreatment[]
+  planItems      TreatmentPlanItem[]
+  materials      ServiceMaterial[]
+
+  @@map("services")
+}
+
+/// Prestazione erogata da un medico, con durata/prezzo eventualmente diversi da quelli standard
+model DoctorService {
+  doctorId       Int     @map("doctor_id")
+  serviceId      Int     @map("service_id")
+  doctor         Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  service        Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// null = usa la durata standard della prestazione
+  durationMin    Int?    @map("duration_min")
+  /// null = usa il prezzo standard della prestazione
+  priceCents     Int?    @map("price_cents")
+  bookableOnline Boolean @default(true) @map("bookable_online")
+
+  @@id([doctorId, serviceId])
+  @@map("doctor_services")
+}
+
+/// Fascia oraria ricorrente settimanale. weekday: 1 = lunedì ... 7 = domenica (ISO)
+model WorkingHours {
+  id        Int    @id @default(autoincrement())
+  doctorId  Int    @map("doctor_id")
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startTime String @map("start_time") // "HH:mm" ora locale dello studio
+  endTime   String @map("end_time")
+
+  @@index([doctorId, weekday])
+  @@map("working_hours")
+}
+
+/// Eccezione all'orario settimanale: in quella data valgono queste fasce al posto di quelle abituali
+model ScheduleException {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int      @map("doctor_id")
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  startTime String   @map("start_time") // "HH:mm" ora locale
+  endTime   String   @map("end_time")
+  note      String?
+
+  @@index([doctorId, date])
+  @@map("schedule_exceptions")
+}
+
+/// Ferie, assenze, blocchi di agenda
+model TimeOff {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int      @map("doctor_id")
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  start     DateTime
+  end       DateTime
+  reason    String?
+
+  @@index([doctorId, start])
+  @@map("time_off")
+}
+
+model Patient {
+  id             Int           @id @default(autoincrement())
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  fiscalCode     String?       @unique @map("fiscal_code")
+  birthDate      DateTime?     @map("birth_date") @db.Date
+  /// comune (o stato estero) di nascita, usato per calcolare il codice fiscale
+  birthPlace     String?       @map("birth_place")
+  gender         String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  privacyConsent Boolean       @default(false) @map("privacy_consent")
+  remindersOptIn Boolean       @default(true) @map("reminders_opt_in")
+  whatsappOptIn  Boolean       @default(true) @map("whatsapp_opt_in")
+  /// cartella dentale attivata (su richiesta, da odontoiatri o amministratori)
+  dentalEnabled  Boolean       @default(false) @map("dental_enabled")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  appointments   Appointment[]
+  dentalTeeth    DentalTooth[]
+  dentalTreatments DentalTreatment[]
+  treatmentPlans TreatmentPlan[]
+  stockMovements StockMovement[]
+  stockDrafts    StockUnloadDraft[]
+
+  @@index([lastName, firstName])
+  @@map("patients")
+}
+
+model Appointment {
+  id                 Int               @id @default(autoincrement())
+  doctorId           Int               @map("doctor_id")
+  doctor             Doctor            @relation(fields: [doctorId], references: [id])
+  patientId          Int               @map("patient_id")
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  serviceId          Int?              @map("service_id")
+  service            Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  start              DateTime
+  end                DateTime
+  status             AppointmentStatus @default(PRENOTATO)
+  source             AppointmentSource @default(INTERNO)
+  notes              String?
+  /// Token per annullamento da parte del paziente (link nelle email)
+  manageToken        String            @unique @map("manage_token")
+  confirmationSentAt DateTime?         @map("confirmation_sent_at")
+  reminderSentAt     DateTime?         @map("reminder_sent_at")
+  createdById        Int?              @map("created_by_id")
+  /// annullamento: quando, se dal paziente (link nel messaggio), motivo, e quando la segreteria l'ha visto
+  cancelledAt        DateTime?         @map("cancelled_at")
+  cancelledByPatient Boolean           @default(false) @map("cancelled_by_patient")
+  cancelReason       String?           @map("cancel_reason")
+  cancelSeenAt       DateTime?         @map("cancel_seen_at")
+  notifications      Notification[]
+  request            BookingRequest?   @relation("RequestAppointment")
+  moveRequests       BookingRequest[]  @relation("MoveRequest")
+  dentalTreatments   DentalTreatment[]
+  planItems          TreatmentPlanItem[]
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@index([doctorId, start])
+  @@index([patientId])
+  @@index([start])
+  @@map("appointments")
+}
+
+/// Registro dei messaggi inviati ai pazienti (email, WhatsApp)
+model Notification {
+  id            Int                 @id @default(autoincrement())
+  appointmentId Int                 @map("appointment_id")
+  appointment   Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  channel       NotificationChannel
+  kind          NotificationKind
+  status        NotificationStatus
+  recipient     String
+  error         String?
+  providerId    String?             @map("provider_id")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([appointmentId])
+  @@map("notifications")
+}
+
+/// Richiesta di prenotazione inviata dal sito: diventa un appuntamento solo quando lo studio la conferma
+model BookingRequest {
+  id             Int           @id @default(autoincrement())
+  status         RequestStatus @default(NUOVA)
+  doctorId       Int           @map("doctor_id")
+  doctor         Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  /// null solo per gli spostamenti di appuntamenti senza prestazione
+  serviceId      Int?          @map("service_id")
+  service        Service?      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// orario scelto dal paziente (facoltativo): resta "tenuto" finché la richiesta è NUOVA
+  preferredStart DateTime?     @map("preferred_start")
+  preferredEnd   DateTime?     @map("preferred_end")
+  /// preferenze libere, es. "martedì mattina"
+  preferences    String?
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  email          String
+  phone          String
+  fiscalCode     String?       @map("fiscal_code")
+  birthDate      DateTime?     @map("birth_date") @db.Date
+  notes          String?
+  whatsappOptIn  Boolean       @default(true) @map("whatsapp_opt_in")
+  appointmentId  Int?          @unique @map("appointment_id")
+  appointment    Appointment?  @relation("RequestAppointment", fields: [appointmentId], references: [id], onDelete: SetNull)
+  /// richiesta di spostamento di un appuntamento esistente (dal link nel messaggio al paziente)
+  moveOfId       Int?          @map("move_of_id")
+  moveOf         Appointment?  @relation("MoveRequest", fields: [moveOfId], references: [id], onDelete: Cascade)
+  handledById    Int?          @map("handled_by_id")
+  handledAt      DateTime?     @map("handled_at")
+  rejectReason   String?       @map("reject_reason")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@index([doctorId, preferredStart])
+  @@map("booking_requests")
+}
+
+/// PC dello studio autorizzato a scaricare la copia di emergenza dell'agenda (sola lettura)
+model EmergencyDevice {
+  id          Int       @id @default(autoincrement())
+  name        String
+  /// impronta SHA-256 della chiave: la chiave in chiaro viene mostrata una sola volta
+  tokenHash   String    @unique @map("token_hash")
+  tokenPrefix String    @map("token_prefix")
+  createdById Int?      @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  lastIp      String?   @map("last_ip")
+  revokedAt   DateTime? @map("revoked_at")
+
+  @@map("emergency_devices")
+}
+
+/// Stato attuale di un dente del paziente (numerazione FDI: 11-48 permanenti, 51-85 decidui)
+model DentalTooth {
+  id          Int      @id @default(autoincrement())
+  patientId   Int      @map("patient_id")
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tooth       Int
+  /// SANO, CARIE, OTTURATO, DEVITALIZZATO, CORONA, IMPIANTO, PONTE, MANCANTE, DA_ESTRARRE
+  status      String   @default("SANO")
+  /// condizione delle superfici: { "O": "CARIE", "M": "OTTURAZIONE", ... } (O, M, D, V, L)
+  surfaces    Json     @default("{}")
+  note        String?
+  updatedById Int?     @map("updated_by_id")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([patientId, tooth])
+  @@map("dental_teeth")
+}
+
+/// Diario dei trattamenti odontoiatrici eseguiti
+model DentalTreatment {
+  id            Int          @id @default(autoincrement())
+  patientId     Int          @map("patient_id")
+  patient       Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  date          DateTime     @db.Date
+  /// dente FDI (null = trattamento generale, es. igiene)
+  tooth         Int?
+  /// superfici trattate, es. "OM"
+  surfaces      String?
+  serviceId     Int?         @map("service_id")
+  service       Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  doctorId      Int          @map("doctor_id")
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  appointmentId Int?         @map("appointment_id")
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  description   String
+  notes         String?
+  createdById   Int?         @map("created_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  planItem      TreatmentPlanItem?
+  stockMovements StockMovement[]
+  stockDrafts    StockUnloadDraft[]
+
+  @@index([patientId, date])
+  @@map("dental_treatments")
+}
+
+enum PlanStatus {
+  PROPOSTO   // preventivo consegnato, in attesa di risposta
+  ACCETTATO  // il paziente ha accettato: si prenotano le sedute
+  COMPLETATO
+  RIFIUTATO
+}
+
+enum PlanItemStatus {
+  DA_FARE
+  PROGRAMMATO // seduta prenotata in agenda
+  ESEGUITO
+}
+
+/// Piano di cura odontoiatrico, che fa anche da preventivo
+model TreatmentPlan {
+  id            Int        @id @default(autoincrement())
+  /// numero del preventivo, progressivo per anno (es. 2026/12)
+  year          Int
+  number        Int
+  patientId     Int        @map("patient_id")
+  patient       Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId      Int        @map("doctor_id")
+  doctor        Doctor     @relation(fields: [doctorId], references: [id])
+  title         String
+  status        PlanStatus @default(PROPOSTO)
+  /// sconto sul totale, in centesimi
+  discountCents Int        @default(0) @map("discount_cents")
+  validUntil    DateTime?  @map("valid_until") @db.Date
+  /// note stampate sul preventivo (modalità di pagamento, ecc.)
+  notes         String?
+  acceptedAt    DateTime?  @map("accepted_at")
+  createdById   Int?       @map("created_by_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  items         TreatmentPlanItem[]
+
+  @@unique([year, number])
+  @@index([patientId])
+  @@index([status])
+  @@map("treatment_plans")
+}
+
+model TreatmentPlanItem {
+  id             Int              @id @default(autoincrement())
+  planId         Int              @map("plan_id")
+  plan           TreatmentPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  position       Int              @default(0)
+  serviceId      Int?             @map("service_id")
+  service        Service?         @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  description    String
+  tooth          Int?
+  surfaces       String?
+  quantity       Int              @default(1)
+  unitPriceCents Int              @default(0) @map("unit_price_cents")
+  status         PlanItemStatus   @default(DA_FARE)
+  /// seduta prenotata
+  appointmentId  Int?             @map("appointment_id")
+  appointment    Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  /// trattamento registrato nel diario quando la voce è eseguita
+  treatmentId    Int?             @unique @map("treatment_id")
+  treatment      DentalTreatment? @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  doneAt         DateTime?        @map("done_at")
+
+  @@index([planId])
+  @@map("treatment_plan_items")
+}
+
+enum StockMovementType {
+  CARICO
+  SCARICO
+  RETTIFICA
+}
+
+/// Articolo del magazzino odontoiatrico
+model StockItem {
+  id                 Int       @id @default(autoincrement())
+  name               String
+  /// codice interno (facoltativo)
+  code               String?   @unique
+  category           String?
+  supplier           String?
+  /// unità di misura: pz, conf, ml, g...
+  unit               String    @default("pz")
+  purchasePriceCents Int?      @map("purchase_price_cents")
+  /// sotto questa quantità l'articolo è "sottoscorta"
+  minStock           Float     @default(0) @map("min_stock")
+  /// giacenza attuale (somma dei movimenti)
+  quantity           Float     @default(0)
+  /// gestione per lotti e scadenze
+  trackLots          Boolean   @default(false) @map("track_lots")
+  /// impianto / dispositivo da tracciare sul paziente
+  isImplant          Boolean   @default(false) @map("is_implant")
+  active             Boolean   @default(true)
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  barcodes           StockBarcode[]
+  lots               StockLot[]
+  movements          StockMovement[]
+  serviceMaterials   ServiceMaterial[]
+  drafts             StockUnloadDraft[]
+
+  @@index([name])
+  @@map("stock_items")
+}
+
+/// Codici a barre dell'articolo (EAN / GTIN): un articolo può averne più di uno (es. confezione e singolo pezzo)
+model StockBarcode {
+  id       Int       @id @default(autoincrement())
+  itemId   Int       @map("item_id")
+  item     StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  /// codice normalizzato (GTIN a 14 cifre quando numerico)
+  code     String    @unique
+  /// pezzi caricati con una lettura (es. scatola da 10)
+  packQty  Float     @default(1) @map("pack_qty")
+
+  @@map("stock_barcodes")
+}
+
+model StockLot {
+  id        Int       @id @default(autoincrement())
+  itemId    Int       @map("item_id")
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  lot       String
+  expiry    DateTime? @db.Date
+  quantity  Float     @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  movements StockMovement[]
+
+  @@unique([itemId, lot])
+  @@index([expiry])
+  @@map("stock_lots")
+}
+
+/// Movimento di magazzino. quantity con segno: + entra, - esce
+model StockMovement {
+  id            Int               @id @default(autoincrement())
+  itemId        Int               @map("item_id")
+  item          StockItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  lotId         Int?              @map("lot_id")
+  lot           StockLot?         @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  type          StockMovementType
+  quantity      Float
+  unitCostCents Int?              @map("unit_cost_cents")
+  supplier      String?
+  /// documento di trasporto / fattura
+  document      String?
+  /// tracciabilità: paziente e dente (impianti)
+  patientId     Int?              @map("patient_id")
+  patient       Patient?          @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  tooth         Int?
+  /// scarico automatico da un trattamento del diario
+  treatmentId   Int?              @map("treatment_id")
+  treatment     DentalTreatment?  @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  auto          Boolean           @default(false)
+  serial        String?
+  note          String?
+  createdById   Int?              @map("created_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@index([itemId, createdAt])
+  @@index([patientId])
+  @@index([treatmentId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+/// Materiali consumati da una prestazione: scaricati in automatico quando il trattamento è registrato
+model ServiceMaterial {
+  serviceId Int       @map("service_id")
+  service   Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  itemId    Int       @map("item_id")
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity  Float
+
+  @@id([serviceId, itemId])
+  @@map("service_materials")
+}
+
+/// Materiale da scaricare proposto da un trattamento: diventa uno scarico solo quando il medico lo conferma
+model StockUnloadDraft {
+  id          Int              @id @default(autoincrement())
+  itemId      Int              @map("item_id")
+  item        StockItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity    Float
+  doctorId    Int              @map("doctor_id")
+  doctor      Doctor           @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientId   Int?             @map("patient_id")
+  patient     Patient?         @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  tooth       Int?
+  treatmentId Int?             @map("treatment_id")
+  treatment   DentalTreatment? @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([doctorId, date])
+  @@map("stock_unload_drafts")
+}
+
+/// Promemoria inviato a un medico con i suoi appuntamenti di una data
+model DoctorReminder {
+  id          Int                 @id @default(autoincrement())
+  doctorId    Int                 @map("doctor_id")
+  doctor      Doctor              @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date        DateTime            @db.Date
+  channel     NotificationChannel
+  status      NotificationStatus
+  recipient   String
+  count       Int                 @default(0)
+  error       String?
+  sentById    Int?                @map("sent_by_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  @@index([doctorId, date])
+  @@map("doctor_reminders")
+}
